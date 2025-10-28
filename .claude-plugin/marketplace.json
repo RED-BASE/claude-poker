@@ -8,10 +8,10 @@
       "displayName": "Claude Poker",
       "description": "Autonomous AI poker player - Claude plays FOR ITSELF at live tables",
       "version": "1.0.0",
-      "author": "maroon-beret",
+      "author": "Red-base",
       "source": {
         "type": "github",
-        "owner": "maroon-beret",
+        "owner": "Red-base",
         "repo": "claude-poker"
       },
       "category": "Games",

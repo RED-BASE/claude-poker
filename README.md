@@ -214,7 +214,7 @@ MIT
 
 ## Author
 
-Built with Claude Code by [@maroon-beret](https://github.com/maroon-beret)
+Built with Claude Code by [@Red-base](https://github.com/Red-base)
 
 ---
 
