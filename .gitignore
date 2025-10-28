@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.jpg
+*.png
+*.log
+.DS_Store
+token.json
+credentials.json
+.env
