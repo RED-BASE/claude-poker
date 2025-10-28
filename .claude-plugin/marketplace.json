@@ -1,0 +1,22 @@
+{
+  "name": "claude-poker-marketplace",
+  "description": "Claude Poker plugin marketplace",
+  "version": "1.0.0",
+  "plugins": [
+    {
+      "name": "claude-poker",
+      "displayName": "Claude Poker",
+      "description": "Autonomous AI poker player - Claude plays FOR ITSELF at live tables",
+      "version": "1.0.0",
+      "author": "maroon-beret",
+      "source": {
+        "type": "github",
+        "owner": "maroon-beret",
+        "repo": "claude-poker"
+      },
+      "category": "Games",
+      "keywords": ["poker", "ai", "voice", "autonomous", "game"],
+      "strict": true
+    }
+  ]
+}

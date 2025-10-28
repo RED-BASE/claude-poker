@@ -1,0 +1,29 @@
+{
+  "name": "claude-poker",
+  "displayName": "Claude Poker",
+  "description": "Autonomous AI poker player with voice I/O and trash talk",
+  "version": "1.0.0",
+  "author": "maroon-beret",
+  "repository": "https://github.com/maroon-beret/claude-poker",
+  "license": "MIT",
+  "keywords": ["poker", "ai", "voice", "game", "autonomous"],
+  "category": "Games",
+
+  "mcpServers": {
+    "claude-poker": {
+      "command": "python3",
+      "args": ["poker-mcp-server.py"]
+    }
+  },
+
+  "hooks": {
+    "session-start": "bash hooks/start-web-server.sh"
+  },
+
+  "commands": {
+    "poker-status": {
+      "description": "Check poker system status",
+      "script": "bash hooks/status.sh"
+    }
+  }
+}
