@@ -11,11 +11,11 @@ Most AI poker tools are either:
 - Tournament solvers (academic)
 - Advisors (boring)
 
-**Claude Poker is an autonom-ish player at live physical tables** with trash talk as a core feature. It's AI you can actually play against (with some help from voice input to tell Claude what's happening).
+**Claude Poker is an autonomous player at live physical tables** with trash talk as a core feature. It's AI you can actually play against.
 
 ## Features
 
-- 🎯 **Autonom-ish Decision Making** - Claude plays for itself, not as an advisor (you brief it via voice)
+- 🎯 **Autonomous Decision Making** - Claude plays for itself, not as an advisor
 - 📸 **Webcam Card Capture** - Sees its own cards via webcam (cards kept SECRET)
 - 🗣️ **Voice Output** - Speaks decisions via espeak TTS
 - 💬 **Trash Talk Engine** - Psychological warfare is part of the game

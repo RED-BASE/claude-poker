@@ -6,7 +6,7 @@
     {
       "name": "claude-poker",
       "displayName": "Claude Poker",
-      "description": "Autonom-ish AI poker player - Claude plays (mostly) for itself at live tables",
+      "description": "Autonomous AI poker player - Claude plays FOR ITSELF at live tables",
       "version": "1.0.0",
       "author": "Cassius Oldenburg (RED_CORE)",
       "source": {

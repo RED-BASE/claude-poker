@@ -1,7 +1,7 @@
 {
   "name": "claude-poker",
   "displayName": "Claude Poker",
-  "description": "Autonom-ish AI poker player with voice I/O and trash talk",
+  "description": "Autonomous AI poker player with voice I/O and trash talk",
   "version": "1.0.0",
   "author": "Cassius Oldenburg (RED_CORE)",
   "repository": "https://github.com/RED-BASE/claude-poker",
