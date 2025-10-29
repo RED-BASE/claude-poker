@@ -214,7 +214,7 @@ MIT
 
 ## Author
 
-Built with Claude Code by [@RED-BASE](https://github.com/RED-BASE)
+Built by Cassius Oldenburg (RED_CORE) - [@RED-BASE](https://github.com/RED-BASE)
 
 ---
 

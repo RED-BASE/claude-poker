@@ -8,7 +8,7 @@
       "displayName": "Claude Poker",
       "description": "Autonomous AI poker player - Claude plays FOR ITSELF at live tables",
       "version": "1.0.0",
-      "author": "RED-BASE",
+      "author": "Cassius Oldenburg (RED_CORE)",
       "source": {
         "type": "github",
         "owner": "RED-BASE",
