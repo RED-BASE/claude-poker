@@ -1,8 +1,8 @@
 # Claude Poker 🎰♠️
 
-**Autonomous AI poker player that sits at real tables and talks trash.**
+**Autonom-ish AI poker player that sits at real tables and talks trash.**
 
-Claude doesn't just advise - Claude *plays*. Using computer vision to see its own cards, real-time strategy, and voice output, Claude is a full poker player with personality.
+Claude doesn't just advise - Claude *plays*. Using computer vision to see its own cards, real-time strategy, and voice output, Claude is a full poker player with personality. (Well, mostly autonomous - you still need to brief Claude on what's happening at the table.)
 
 ## What Makes This Different
 
@@ -11,11 +11,11 @@ Most AI poker tools are either:
 - Tournament solvers (academic)
 - Advisors (boring)
 
-**Claude Poker is an autonomous player at live physical tables** with trash talk as a core feature. It's AI you can actually play against.
+**Claude Poker is an autonom-ish player at live physical tables** with trash talk as a core feature. It's AI you can actually play against (with some help from voice input to tell Claude what's happening).
 
 ## Features
 
-- 🎯 **Autonomous Decision Making** - Claude plays for itself, not as an advisor
+- 🎯 **Autonom-ish Decision Making** - Claude plays for itself, not as an advisor (you brief it via voice)
 - 📸 **Webcam Card Capture** - Sees its own cards via webcam (cards kept SECRET)
 - 🗣️ **Voice Output** - Speaks decisions via espeak TTS
 - 💬 **Trash Talk Engine** - Psychological warfare is part of the game
