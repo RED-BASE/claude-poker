@@ -1,0 +1,3 @@
+# Claude Poker MCP Server Dependencies
+mcp>=1.0.0
+flask>=3.0.0

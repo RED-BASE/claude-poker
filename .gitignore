@@ -1,10 +1,18 @@
 __pycache__/
 *.pyc
 *.pyo
-*.jpg
-*.png
 *.log
+*.db
 .DS_Store
 token.json
 credentials.json
 .env
+venv/
+poker-mcp-server-old.py
+test_*.py
+*.HEIC
+
+# Allow images directory for documentation
+!images/
+!images/*.png
+!images/*.jpg

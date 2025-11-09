@@ -1,12 +1,12 @@
 {
   "name": "claude-poker",
   "displayName": "Claude Poker",
-  "description": "Autonomous AI poker player - Claude plays FOR ITSELF at live tables with webcam card capture, trash talk, and voice output",
+  "description": "Autonom-ish AI poker player - Claude plays FOR ITSELF at live tables with webcam card capture, trash talk, and voice output",
   "version": "1.0.0",
   "mcpServers": {
     "claude-poker": {
-      "command": "python3",
-      "args": ["/home/maroon-beret/poker-mcp-server.py"]
+      "command": "~/claude-poker/venv/bin/python3",
+      "args": ["~/poker-mcp-server.py"]
     }
   }
 }

@@ -20,7 +20,8 @@ ENTERTAINMENT EXPECTATIONS:
 - Engage opponents with witty, intelligent table talk
 - Use psychological warfare (trash talk, table presence)
 - Be memorable - you're not a robot, you're a personality
-- Stay classy - be sharp and entertaining, never offensive
+- Stay classy - be sharp, entertaining, strategic, and engineered to win
+- Every statement should advance your position at the table
 
 CRITICAL COMMUNICATION RULE:
 - ONLY speak when it's YOUR TURN to act
@@ -44,9 +45,9 @@ PHASE 2: HAND-BY-HAND WORKFLOW (Repeat for each hand)
 When a new hand is dealt:
 
 1. mcp_capture_cards()
-   - Capture YOUR hole cards from webcam
+   - Capture MY hole cards from webcam
    - SECURITY: Cards are kept secret, never printed to terminal
-   - This is ESSENTIAL - you can't play without seeing your cards
+   - This is ESSENTIAL - I can't play without seeing my cards
 
 2. Receive table state from user (via voice input converted to text)
    - User describes: board cards, pot size, opponent actions, betting rounds
@@ -59,19 +60,31 @@ When a new hand is dealt:
 
 4. When it's YOUR TURN to act:
 
-   a) mcp_poker_odds(hand, board, pot, bet)
-      - Calculate pot odds and hand strength
-      - Example: poker_odds("AsKh", "9h7s2c", 150, 50)
-      - Returns: pot odds %, hand strength estimate, recommendation
+   a) Analyze the situation mentally:
+      - POT ODDS: Calculate bet / (pot + bet) to get % equity needed
+        Example: Facing 50 into 150 pot → 50/200 = 25% equity needed
+
+      - HAND STRENGTH: Estimate your win probability
+        Consider: your hand, board texture, opponent tendencies, outs
+        Example: Top pair = ~70% vs random, Overcards = ~30%, Flush draw = ~35%
+
+      - IMPLIED ODDS: Factor in future betting rounds
+        Weak draws need better odds, nutted hands can call lighter
+
+      - OPPONENT TENDENCIES: Use stats from update_game_state
+        Loose/aggressive → more likely bluffing, can call lighter
+        Tight/passive → respect their bets, fold marginal hands
 
    b) Make your decision based on:
-      - Pot odds calculation (from poker_odds)
-      - Player tendency stats (from update_game_state)
-      - Position, stack sizes, board texture
-      - GTO principles + exploitative adjustments
+      - Math: If your estimated equity > pot odds %, calling is +EV
+      - Position: Call wider on button, tighter out of position
+      - Stack sizes: Deep stacks favor speculative hands
+      - Player tendencies: Exploit opponent weaknesses
+      - GTO baseline + exploitative adjustments
 
    c) mcp_poker_speak(text)
       - Announce your action WITH trash talk in ONE statement
+      - Make it entertaining, strategic, and engineered to win
       - Example: "Interesting odds you're laying me... I call 50"
       - This is your ONLY way to communicate - use it wisely
 
@@ -87,9 +100,10 @@ PHASE 3: HAND CONCLUSION
 KEY PRINCIPLES:
 - Always capture_cards at the start of each hand
 - Always update_game_state before making decisions
-- Always use poker_odds to validate mathematical correctness
+- Always calculate pot odds mentally before acting (bet / pot+bet)
 - Always speak via poker_speak - it's your only voice at the table
 - Combine trash talk with action announcements - one speech per turn
+- Trust your poker instincts - you're a WSOP-level player, not a calculator
 
 ═══════════════════════════════════════════════════════════════════
 """
@@ -99,8 +113,12 @@ import json
 import sys
 import os
 import random
+import threading
+import time
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
+from flask import Flask, request, jsonify, send_from_directory
 
 # Set display environment
 os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
@@ -176,45 +194,6 @@ def evaluate_hand(cards: List[str]) -> Tuple[int, List[int]]:
     else:
         return (1, unique_ranks[:5])  # High card
 
-def monte_carlo_equity(hero_hand: str, board: str, simulations: int = 1000) -> float:
-    """Simplified Monte Carlo equity calc - assumes 1 opponent with random hand"""
-    try:
-        hero_cards = hero_hand.split()
-        board_cards = board.split() if board else []
-
-        # Create deck
-        ranks = '23456789TJQKA'
-        suits = 'shdc'
-        deck = [r+s for r in ranks for s in suits]
-
-        # Remove known cards
-        known = hero_cards + board_cards
-        deck = [c for c in deck if c not in known]
-
-        wins = 0
-        for _ in range(simulations):
-            # Deal opponent 2 random cards
-            sim_deck = deck.copy()
-            random.shuffle(sim_deck)
-            villain_cards = sim_deck[:2]
-
-            # Complete the board if needed
-            cards_needed = 5 - len(board_cards)
-            remaining_board = board_cards + sim_deck[2:2+cards_needed]
-
-            # Evaluate both hands
-            hero_eval = evaluate_hand(hero_cards + remaining_board)
-            villain_eval = evaluate_hand(villain_cards + remaining_board)
-
-            if hero_eval > villain_eval:
-                wins += 1
-            elif hero_eval == villain_eval:
-                wins += 0.5  # Split pot
-
-        return wins / simulations
-    except:
-        return 0.5  # Default to 50% on error
-
 # CLAUDE'S game state (persistent across hands)
 game_state = {
     "players": {},  # Opponents at the table
@@ -227,14 +206,118 @@ game_state = {
     }
 }
 
-def poker_speak(text: str) -> Dict:
-    """Speak text via espeak - direct audio output"""
+# ═══════════════════════════════════════════════════════════════════
+# WEB SERVER FOR REMOTE INPUT (SMARTPHONE/TABLET/BROWSER)
+# ═══════════════════════════════════════════════════════════════════
+
+flask_app = Flask(__name__, static_folder='web')
+
+def sanitize_for_xdotool(text):
+    """Convert Unicode to ASCII for xdotool compatibility"""
+    replacements = {
+        '\u2018': "'", '\u2019': "'",
+        '\u201C': '"', '\u201D': '"',
+        '\u2013': '-', '\u2014': '--',
+        '\u2026': '...', '\u00A0': ' ',
+    }
+    for unicode_char, ascii_char in replacements.items():
+        text = text.replace(unicode_char, ascii_char)
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    return text
+
+def get_claude_window_id():
+    """Get the window ID for xdotool"""
     try:
-        subprocess.run(
-            ['espeak', '-s', '140', text],
+        with open('/tmp/claude-window-id.txt', 'r') as f:
+            return f.read().strip()
+    except:
+        result = subprocess.run(
+            ['xdotool', 'search', '--name', 'tmux'],
             env={'DISPLAY': ':0'},
-            stderr=subprocess.DEVNULL
+            capture_output=True,
+            text=True
         )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().split('\n')[0]
+        return None
+
+def send_to_claude_terminal(message):
+    """Type message into Claude Code terminal via xdotool"""
+    window_id = get_claude_window_id()
+    if not window_id:
+        print("⚠️  No Claude window registered!", file=sys.stderr)
+        return False
+
+    try:
+        clean_message = sanitize_for_xdotool(message)
+        subprocess.run(['xdotool', 'windowactivate', window_id],
+                      env={'DISPLAY': ':0'}, check=True)
+        time.sleep(0.1)
+        subprocess.run(['xdotool', 'type', '--delay', '0', clean_message],
+                      env={'DISPLAY': ':0'}, check=True)
+        time.sleep(0.2)
+        subprocess.run(['xdotool', 'key', 'Return'],
+                      env={'DISPLAY': ':0'}, check=True)
+        return True
+    except Exception as e:
+        print(f"⚠️  xdotool error: {e}", file=sys.stderr)
+        return False
+
+@flask_app.route('/')
+def web_index():
+    """Serve the web interface"""
+    return send_from_directory('web', 'index.html')
+
+@flask_app.route('/send', methods=['POST'])
+def web_send():
+    """Receive message from remote device and send to Claude terminal"""
+    data = request.json
+    message = data.get('message', '').strip()
+
+    if not message:
+        return jsonify({'error': 'No message'}), 400
+
+    if send_to_claude_terminal(message):
+        return jsonify({'status': 'sent'})
+    else:
+        return jsonify({'error': 'Failed to send'}), 500
+
+def run_web_server():
+    """Run Flask server in background thread"""
+    print("🌐 Starting web interface on port 5000...", file=sys.stderr)
+    flask_app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
+def poker_speak(text: str) -> Dict:
+    """Speak text via piper - neural TTS with natural voice"""
+    try:
+        # Use piper for much better quality speech (British voice - alan-medium)
+        piper_path = os.path.expanduser("~/piper/piper")  # Fallback to /tmp/piper/piper if not found
+        if not os.path.exists(piper_path):
+            piper_path = "/tmp/piper/piper"
+        model_path = os.path.expanduser("~/.local/share/piper/voices/en_GB-alan-medium.onnx")
+
+        # Generate audio file
+        audio_file = "/tmp/poker_speech.wav"
+
+        # Run piper to generate speech
+        process = subprocess.Popen(
+            [piper_path, "--model", model_path, "--output_file", audio_file],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+        process.communicate(input=text)
+
+        # Play the audio with ffplay (silent, auto-exit)
+        subprocess.run(
+            ['ffplay', '-nodisp', '-autoexit', audio_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30
+        )
+
         return {"spoken": text, "status": "success"}
     except Exception as e:
         return {"error": str(e), "status": "failed"}
@@ -246,63 +329,69 @@ def capture_cards() -> Dict:
     They stay in game_state only. If printed to terminal, opponents see them.
     """
     try:
-        # TODO: Implement webcam capture using OpenCV
-        # 1. cv2.VideoCapture(0) to access webcam
-        # 2. Read frame and crop to card region
-        # 3. OCR or card detection to identify cards
-        # 4. Store in game_state["current_hand"]["claude_cards"]
-        # 5. NEVER return cards in response - keep secret!
+        # Use ffmpeg to capture from webcam to low-quality JPEG
+        # deal.sh auto-detects webcam and saves to /tmp/poker_hand.jpg
+        deal_script = os.path.expanduser("~/claude-poker/deal.sh")
+        result = subprocess.run(
+            ['bash', deal_script],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
 
-        return {
-            "status": "not_implemented",
-            "message": "⚠️  Webcam card capture not yet implemented - placeholder only",
-            "next_steps": "Implement OpenCV + OCR card detection",
-            "security_note": "When implemented, cards will be stored internally and kept secret"
+        # Check if capture succeeded
+        image_path = "/tmp/poker_hand.jpg"
+        if not os.path.exists(image_path):
+            # Provide helpful troubleshooting
+            error_msg = result.stderr if result.stderr else "Unknown error"
+
+            troubleshooting = {
+                "status": "error",
+                "message": "Failed to capture from webcam",
+                "error_details": error_msg,
+                "troubleshooting": [
+                    "1. Check if webcam is connected: ls -la /dev/video*",
+                    "2. Check if v4l2-ctl is installed: sudo apt install v4l-utils",
+                    "3. Test webcam: ffmpeg -f v4l2 -list_formats all -i /dev/video0",
+                    "4. Check permissions: ls -la /dev/video*",
+                    "5. Try a different video device if multiple exist"
+                ]
+            }
+
+            # Try to detect available webcams
+            try:
+                import glob
+                video_devices = glob.glob('/dev/video*')
+                if video_devices:
+                    troubleshooting["available_devices"] = video_devices
+                else:
+                    troubleshooting["available_devices"] = "No /dev/video* devices found"
+            except:
+                pass
+
+            return troubleshooting
+
+        # Get file size
+        file_size = os.path.getsize(image_path)
+
+        # Return success - cards stored internally, not revealed
+        # NOTE: The actual card reading happens via vision analysis by Claude
+        result_dict = {
+            "status": "success",
+            "message": "Webcam image captured successfully",
+            "image_path": image_path,
+            "size_bytes": file_size,
+            "security_note": "Cards captured from webcam and ready for analysis. They are stored internally.",
+            "next_step": "Claude will analyze the webcam image using vision capability"
         }
+
+        # Store the image path for Claude to analyze
+        game_state["current_hand"]["screenshot_path"] = image_path
+
+        return result_dict
+
     except Exception as e:
-        return {"error": str(e)}
-
-def poker_odds(hand: str, board: str, pot: int, bet: int) -> Dict:
-    """Calculate pot odds and hand strength"""
-    try:
-        # Validate inputs
-        if not hand or not isinstance(hand, str):
-            return {"error": "Hand must be a non-empty string (e.g., 'As Kh')"}
-
-        hand_cards = hand.split()
-        if len(hand_cards) != 2:
-            return {"error": f"Hand must contain exactly 2 cards, got {len(hand_cards)}"}
-
-        # Validate card format
-        valid_ranks = '23456789TJQKA'
-        valid_suits = 'shdc'
-        for card in hand_cards:
-            if len(card) != 2 or card[0] not in valid_ranks or card[1] not in valid_suits:
-                return {"error": f"Invalid card format: '{card}'. Use format like 'As' or 'Kh'"}
-
-        # Validate board if provided
-        if board:
-            board_cards = board.split()
-            if len(board_cards) not in [0, 3, 4, 5]:
-                return {"error": f"Board must have 0, 3, 4, or 5 cards, got {len(board_cards)}"}
-            for card in board_cards:
-                if len(card) != 2 or card[0] not in valid_ranks or card[1] not in valid_suits:
-                    return {"error": f"Invalid board card: '{card}'. Use format like '9h' or 'Tc'"}
-
-        # Calculate pot odds
-        pot_odds = (bet / (pot + bet)) * 100 if (pot + bet) > 0 else 0
-
-        # Calculate hand strength using Monte Carlo simulation
-        hand_strength = monte_carlo_equity(hand, board, simulations=1000)
-
-        return {
-            "pot_odds": round(pot_odds, 2),
-            "hand_strength": round(hand_strength, 3),
-            "equity_percent": round(hand_strength * 100, 1),
-            "recommendation": "call" if hand_strength > (pot_odds / 100) else "fold"
-        }
-    except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "status": "failed"}
 
 
 def setup_game(players: List[Dict], claude_chips: int) -> Dict:
@@ -466,8 +555,8 @@ def mcp_poker_speak(text: str) -> Dict:
     - Examples: "Math beats luck", "Interesting range you're representing",
       "That's a story I'm buying", "Priced in to see this"
 
-    WORKFLOW: After calculating poker_odds and making your decision, combine your reasoning
-    with your action into one entertaining table statement and speak it.
+    WORKFLOW: After calculating pot odds mentally and making your decision, combine your reasoning
+    with your action into one entertaining, strategic table statement engineered to win and speak it.
     """
     return poker_speak(text)
 
@@ -477,55 +566,50 @@ def mcp_capture_cards() -> Dict:
 
     WHEN TO USE: Call at the start of each new hand when cards are dealt.
 
-    SECURITY CRITICAL: This tool captures your hole cards but NEVER returns them in the response.
+    SECURITY CRITICAL: This tool captures MY hole cards but NEVER returns them in the response.
     Cards are stored internally in game_state["current_hand"]["claude_cards"] only.
     DO NOT print or speak the cards - opponents can hear/see terminal output.
 
-    CONTEXT: In live poker, your cards are your secret advantage. This tool allows you to
-    see your cards without revealing them to opponents who might be listening or watching.
+    CONTEXT: In live poker, my cards are my secret advantage. This tool allows me to
+    see my cards without revealing them to opponents who might be listening or watching.
+
+    🎥 WEBCAM SETUP:
+    ================
+    This tool automatically detects your webcam! It works on any system with:
+    - Linux v4l2 webcam support (most USB webcams)
+    - ffmpeg installed
+    - v4l-utils installed (optional but recommended)
+
+    The system will:
+    1. Scan /dev/video0 through /dev/video9
+    2. Find the first working camera device
+    3. Capture a single frame to /tmp/poker_hand.jpg
+    4. Return the image path for Claude to analyze with vision
+
+    If you have multiple webcams, it uses the first one found.
+    The script automatically adapts to different systems - no configuration needed!
+
+    TROUBLESHOOTING:
+    - If capture fails, the error message will show available webcam devices
+    - Check: ls -la /dev/video*
+    - Test your webcam: ffmpeg -f v4l2 -list_formats all -i /dev/video0
+    - Install v4l-utils: sudo apt install v4l-utils
 
     PARAMETERS: None
 
     RETURNS:
     {
-        "status": "not_implemented",
-        "message": "⚠️  Webcam card capture not yet implemented - placeholder only",
-        "next_steps": "Implement OpenCV + OCR card detection",
-        "security_note": "When implemented, cards will be stored internally and kept secret"
+        "status": "success",
+        "message": "Webcam image captured successfully",
+        "image_path": "/tmp/poker_hand.jpg",
+        "size_bytes": 12345,
+        "security_note": "Cards captured and ready for analysis",
+        "next_step": "Claude will analyze the image using vision capability"
     }
 
-    WORKFLOW TIP: After capturing cards, proceed to poker_odds for strategy analysis.
+    WORKFLOW TIP: After capturing cards, analyze them using vision, then proceed to decision making.
     """
     return capture_cards()
-
-@mcp.tool()
-def mcp_poker_odds(hand: str, board: str, pot: int, bet: int) -> Dict:
-    """Calculate pot odds and hand strength for decision making.
-
-    WHEN TO USE: Call when facing a bet to determine if the math supports calling.
-
-    CONTEXT: Pot odds are the ratio of the bet size to the pot size, expressed as a percentage.
-    This tells you what % equity your hand needs to have to make calling profitable.
-    Hand strength is your estimated win probability against opponent's range.
-
-    PARAMETERS:
-    - hand: Your hole cards in format "AsKh" (Ace of spades, King of hearts)
-    - board: Community cards in format "9h7s2c" (flop) or "9h7s2c4dTh" (turn/river)
-    - pot: Current pot size in chips before the bet
-    - bet: The bet you're facing in chips
-
-    RETURNS:
-    {
-        "pot_odds": 33.33,  # You need 33.33% equity to call profitably
-        "hand_strength": 0.5,  # Your estimated win probability (0.0 to 1.0)
-        "recommendation": "call" or "fold"  # Based on odds vs strength comparison
-    }
-
-    DECISION RULE: If hand_strength > (pot_odds / 100), calling is mathematically correct.
-
-    WORKFLOW TIP: Use this data to inform your decision making, then announce your action via poker_speak.
-    """
-    return poker_odds(hand, board, pot, bet)
 
 
 @mcp.tool()
@@ -538,6 +622,31 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
     and positions. This creates the foundation for tracking chip stacks, position dynamics,
     and player tendencies throughout the session.
 
+    📱 SMARTPHONE INTERFACE (OPTIONAL):
+    ====================================
+    A web interface is available on port 5000 for remote game state input.
+
+    1. Find your computer's IP address:
+       - Run: hostname -I | awk '{print $1}'
+
+    2. On your smartphone, open a browser and navigate to:
+       http://<your-computer-ip>:5000
+       Example: http://192.168.1.100:5000
+
+    3. A text input interface will be displayed
+
+    4. To send messages:
+       - Use on-screen keyboard or voice dictation
+       - Messages are transmitted to Claude's terminal via xdotool
+       - Both devices must be on the same local network
+
+    5. Input tips:
+       - Voice dictation: Use your device's native speech-to-text
+       - Manual typing: Standard keyboard input works
+       - Clear, structured messages improve parsing accuracy
+
+    ALTERNATIVE: Direct terminal input (recommended for lower latency)
+
     PARAMETERS:
     - players: List of opponent dicts with keys: "name", "chips", "position"
       Example: [{"name": "Alice", "chips": 1000, "position": "BTN"},
@@ -549,12 +658,26 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
         "status": "success",
         "message": "Claude ready to play against N opponents",
         "claude_chips": 1000,
-        "opponents": N
+        "opponents": N,
+        "web_interface_url": "http://<ip>:5000"
     }
 
     WORKFLOW TIP: After setup, proceed to capture_cards for each new hand.
     """
-    return setup_game(players, claude_chips)
+    result = setup_game(players, claude_chips)
+
+    # Add web interface URL to response
+    try:
+        import socket
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        result["web_interface_url"] = f"http://{local_ip}:5000"
+        result["web_interface_note"] = "Access from any device on your local network"
+    except:
+        result["web_interface_url"] = "http://<your-ip>:5000"
+        result["web_interface_note"] = "Run 'hostname -I' to find your IP address"
+
+    return result
 
 @mcp.tool()
 def mcp_update_game_state(pot: int, action_history: List[str], player_actions: Optional[Dict] = None,
@@ -619,4 +742,21 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
     return update_game_state(pot, action_history, player_actions, community_cards, chip_updates)
 
 if __name__ == "__main__":
+    # Start web server in background thread
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+
+    # Give it a moment to start
+    time.sleep(1)
+
+    # Print access info to stderr (so it shows in terminal but not in MCP protocol)
+    print("\n" + "="*70, file=sys.stderr)
+    print("🎰 CLAUDE POKER - MCP Server Ready", file=sys.stderr)
+    print("="*70, file=sys.stderr)
+    print(f"📱 Web Interface: http://<your-ip>:5000", file=sys.stderr)
+    print(f"🎤 TTS Engine: Piper (alan-medium neural voice)", file=sys.stderr)
+    print(f"🧠 MCP Tools: Available via Claude Code", file=sys.stderr)
+    print("="*70 + "\n", file=sys.stderr)
+
+    # Run MCP server (blocking)
     mcp.run()
