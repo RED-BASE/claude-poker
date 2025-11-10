@@ -136,31 +136,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Note:** The MCP server runs inside the venv, but Claude Code will start it automatically via the plugin.
+### Install Claude Poker MCP Server
 
-### Install Claude Poker Plugin
-
-1. Clone repo directly into Claude plugins directory:
+1. Clone the repo anywhere:
 ```bash
-cd ~/.claude/plugins
 git clone https://github.com/RED-BASE/claude-poker.git
-
-# Or if you have it elsewhere, symlink it:
-ln -s /path/to/your/claude-poker ~/.claude/plugins/claude-poker
+cd claude-poker
 ```
 
-2. Install Python dependencies in the plugin's venv:
+2. Create venv and install Python dependencies:
 ```bash
-cd ~/.claude/plugins/claude-poker
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 deactivate
 ```
 
-3. Restart Claude Code to load the plugin
+3. Register MCP server with Claude Code:
+```bash
+claude mcp add claude-poker
+```
 
-**Note:** The plugin uses `${CLAUDE_PLUGIN_ROOT}` to find files, so everything stays in the plugin directory - no copying files around!
+When prompted:
+- **Command**: `~/claude-poker/venv/bin/python3` (adjust path if you cloned elsewhere)
+- **Arguments**: `~/claude-poker/poker-mcp-server.py` (adjust path if you cloned elsewhere)
+
+4. Restart Claude Code to load the MCP server
 
 **Note:** Web server starts automatically when MCP server runs - no need to start separately.
 Access from any device on your local network: `http://<your-ip>:5000`
@@ -169,7 +170,7 @@ Access from any device on your local network: `http://<your-ip>:5000`
 
 ### Game Flow
 
-1. **Start fresh Claude Code session** (to load MCP plugin)
+1. **Start fresh Claude Code session** (to load MCP server)
 
 2. **Setup game via web interface or terminal:**
    ```
