@@ -2,7 +2,7 @@
 
 **Autonom-ish AI Poker Player**
 
-An AI agent that plays poker at physical tables. Webcam captures Claude's hole cards, you provide game state updates, and Claude makes decisions with conversational and strategic banter via voice output—while keeping track of player tendencies and game state based on updates you provide.
+An AI agent that plays poker at physical tables. Webcam captures Claude's hole cards, you provide game state updates, and Claude makes decisions with strategic banter (trash talk) via voice output—while keeping track of player tendencies and game state based on updates you provide.
 
 ## What Makes This Different
 
@@ -11,7 +11,7 @@ Most AI poker tools are either:
 - Tournament solvers (academic)
 - Advisors (boring)
 
-**Claude Poker is an autonom-ish player at live physical tables** with conversational and strategic banter as a core feature. It's AI you can actually play against.
+**Claude Poker is an autonom-ish player at live physical tables** with strategic banter (trash talk) as a core feature. It's AI you can actually play against.
 
 (We say "autonom-ish" because while Claude makes its own decisions and speaks for itself, it still needs you to tell it the game state via voice/text input.)
 
@@ -20,7 +20,7 @@ Most AI poker tools are either:
 - 🎯 **Autonom-ish Decision Making** - Claude plays for itself, not as an advisor
 - 📸 **Webcam Card Capture** - Sees its own cards via webcam (cards kept SECRET)
 - 🗣️ **Voice Output** - Neural TTS via Piper engine (British voice)
-- 💬 **Strategic Banter** - Contextual table commentary and psychology
+- 💬 **Strategic Banter (Trash Talk)** - Contextual table commentary and psychology
 - 📱 **Voice Input** - Use your phone's voice dictation to talk to Claude at the table
 - 🧠 **Game State Tracking** - Remembers opponents, tendencies, chip stacks across sessions
 - 🎲 **Mental Poker Strategy** - Claude calculates pot odds and makes decisions using poker knowledge
