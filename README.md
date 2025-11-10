@@ -76,14 +76,16 @@ When prompted:
 # Restart Claude Code to load the MCP server
 # Then in Claude Code, say:
 
-"Setup game: Alice has 500 chips, Bob has 500 chips, I have 500 chips"
+"Setup game: Alice has 500 chips at button, Bob has 500 chips at small blind, Claude has 500 chips at big blind"
 
-# Place cards in front of webcam and say:
+# Place Claude's cards in front of webcam and say:
 "Capture my cards"
 
 # Update game state and let Claude play:
 "Pot is 30, Alice bet 20, what do you do?"
 ```
+
+**Note:** Claude is a player at the table. You must specify Claude's position and chip stack when setting up the game.
 
 **Note:** Web server starts automatically on port 5000. Access from any device: `http://<your-ip>:5000`
 
@@ -141,11 +143,11 @@ Claude calculates pot odds and makes decisions mentally using poker knowledge, f
 
 1. **Start fresh Claude Code session** (to load MCP server)
 
-2. **Setup game:**
+2. **Setup game** (Claude needs its own position and chip stack):
    ```
    "Setup game: Bob has 500 chips at button,
     Mike has 300 at small blind,
-    I have 400 chips"
+    Claude has 400 chips at big blind"
    ```
 
 3. **New hand:**
