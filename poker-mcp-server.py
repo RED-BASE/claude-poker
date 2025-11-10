@@ -116,6 +116,8 @@ import random
 import threading
 import time
 import unicodedata
+from pathlib import Path
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
 from flask import Flask, request, jsonify, send_from_directory
@@ -205,6 +207,80 @@ game_state = {
         "action_history": []
     }
 }
+
+# ═══════════════════════════════════════════════════════════════════
+# PERSISTENCE - JSON file storage for game state and player stats
+# ═══════════════════════════════════════════════════════════════════
+
+DATA_DIR = Path.home() / ".claude-poker"
+PLAYER_STATS_FILE = DATA_DIR / "player_stats.json"
+CURRENT_GAME_FILE = DATA_DIR / "current_game.json"
+
+def ensure_data_dir():
+    """Create data directory if it doesn't exist"""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_player_stats() -> Dict:
+    """Load historical player statistics from file"""
+    if not PLAYER_STATS_FILE.exists():
+        return {"version": "1.0", "players": {}}
+
+    try:
+        with open(PLAYER_STATS_FILE, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"⚠️  Error loading player stats: {e}", file=sys.stderr)
+        return {"version": "1.0", "players": {}}
+
+def save_player_stats(stats: Dict):
+    """Save historical player statistics to file"""
+    ensure_data_dir()
+    try:
+        with open(PLAYER_STATS_FILE, 'w') as f:
+            json.dump(stats, f, indent=2)
+    except IOError as e:
+        print(f"⚠️  Error saving player stats: {e}", file=sys.stderr)
+
+def load_current_game() -> Dict:
+    """Load current game state from file"""
+    if not CURRENT_GAME_FILE.exists():
+        return None
+
+    try:
+        with open(CURRENT_GAME_FILE, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"⚠️  Error loading current game: {e}", file=sys.stderr)
+        return None
+
+def save_current_game():
+    """Save current game state to file"""
+    ensure_data_dir()
+
+    # Build saveable game state (exclude claude_cards for security)
+    save_data = {
+        "version": "1.0",
+        "started_at": datetime.now().isoformat(),
+        "claude_chips": game_state["claude_chips"],
+        "players": {
+            name: {
+                "chips": data["chips"],
+                "position": data["position"]
+            }
+            for name, data in game_state["players"].items()
+        },
+        "current_hand": {
+            "pot": game_state["current_hand"]["pot"],
+            "community_cards": game_state["current_hand"]["community_cards"],
+            "action_history": game_state["current_hand"]["action_history"]
+        }
+    }
+
+    try:
+        with open(CURRENT_GAME_FILE, 'w') as f:
+            json.dump(save_data, f, indent=2)
+    except IOError as e:
+        print(f"⚠️  Error saving current game: {e}", file=sys.stderr)
 
 # ═══════════════════════════════════════════════════════════════════
 # WEB SERVER FOR REMOTE INPUT (SMARTPHONE/TABLET/BROWSER)
@@ -397,8 +473,14 @@ def capture_cards() -> Dict:
 
 
 def setup_game(players: List[Dict], claude_chips: int) -> Dict:
-    """Initialize game state with CLAUDE and opponents"""
+    """Initialize game state with CLAUDE and opponents
+
+    Loads historical player stats if they exist, creates fresh current_game.json
+    """
     try:
+        # Load historical player stats
+        player_stats = load_player_stats()
+
         game_state["claude_chips"] = claude_chips
         game_state["players"] = {}
 
@@ -407,11 +489,51 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
             chips = player.get("chips", 1000)
             position = player.get("position", "")
 
-            game_state["players"][name] = {
-                "chips": chips,
-                "position": position,
-                "tendencies": []
-            }
+            # Check if we have historical stats for this player
+            if name in player_stats["players"]:
+                historical = player_stats["players"][name]
+                game_state["players"][name] = {
+                    "chips": chips,
+                    "position": position,
+                    "tendencies": [],
+                    # Load historical stats
+                    "hands_played": historical.get("hands_played", 0),
+                    "total_actions": historical.get("total_actions", 0),
+                    "aggressive_actions": historical.get("aggressive_actions", 0),
+                    "folds": historical.get("folds", 0),
+                    "vpip_count": historical.get("vpip_count", 0),
+                    "aggression_pct": historical.get("aggression_pct", 0),
+                    "fold_pct": historical.get("fold_pct", 0),
+                    "vpip_pct": historical.get("vpip_pct", 0),
+                    "last_seen": historical.get("last_seen", "")
+                }
+            else:
+                # New player - initialize with fresh stats
+                game_state["players"][name] = {
+                    "chips": chips,
+                    "position": position,
+                    "tendencies": [],
+                    "hands_played": 0,
+                    "total_actions": 0,
+                    "aggressive_actions": 0,
+                    "folds": 0,
+                    "vpip_count": 0,
+                    "aggression_pct": 0,
+                    "fold_pct": 0,
+                    "vpip_pct": 0,
+                    "last_seen": ""
+                }
+
+        # Reset current hand state
+        game_state["current_hand"] = {
+            "claude_cards": None,
+            "community_cards": [],
+            "pot": 0,
+            "action_history": []
+        }
+
+        # Save fresh current_game.json
+        save_current_game()
 
         return {
             "status": "success",
@@ -503,6 +625,28 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
                     "fold_rate": f"{data['fold_pct']}%",
                     "vpip": f"{data['vpip']}%"
                 }
+
+        # Save current game state
+        save_current_game()
+
+        # Update and save historical player stats
+        player_stats = load_player_stats()
+        for name, data in game_state["players"].items():
+            # Only save if we have action stats to update
+            if "action_stats" in data:
+                stats = data["action_stats"]
+                player_stats["players"][name] = {
+                    "hands_played": data.get("hands_played", 0),
+                    "total_actions": stats["total_actions"],
+                    "aggressive_actions": stats["raises"],
+                    "folds": stats["folds"],
+                    "vpip_count": stats["calls"] + stats["raises"],
+                    "aggression_pct": data.get("aggression_pct", 0),
+                    "fold_pct": data.get("fold_pct", 0),
+                    "vpip_pct": data.get("vpip", 0),
+                    "last_seen": datetime.now().isoformat()
+                }
+        save_player_stats(player_stats)
 
         return {
             "status": "success",

@@ -1,8 +1,8 @@
 # Claude Poker
 
-**AI-Powered Poker Decision Support System**
+**Autonom-ish AI Poker Player**
 
-An integrated system for real-time poker strategy analysis, opponent modeling, and decision support using Claude AI, computer vision, and neural text-to-speech.
+An AI agent that plays poker at physical tables. Webcam captures Claude's hole cards, you provide game state updates, and Claude makes decisions with conversational and strategic banter via voice output—while keeping track of player tendencies and game state based on updates you provide.
 
 ## What Makes This Different
 
@@ -22,7 +22,7 @@ Most AI poker tools are either:
 - 🗣️ **Voice Output** - Neural TTS via Piper engine (British voice)
 - 💬 **Trash Talk Engine** - Contextual table commentary and psychology
 - 📱 **Voice Input** - Use your phone's voice dictation to talk to Claude at the table
-- 🧠 **Game State Tracking** - Remembers opponents, tendencies, chip stacks
+- 🧠 **Game State Tracking** - Remembers opponents, tendencies, chip stacks across sessions
 - 🎲 **Mental Poker Strategy** - Claude calculates pot odds and makes decisions using poker knowledge
 
 ## Architecture
@@ -101,6 +101,29 @@ For optimal card capture, use a simple card holder positioned in front of your w
 - Cards should be clearly visible and flat
 - Test capture by asking Claude: "Capture my cards and tell me what you see"
 - Adjust angle/distance for best clarity
+
+### 5. Data Persistence
+Claude Poker automatically saves game data to `~/.claude-poker/` with two JSON files:
+
+**`player_stats.json`** - Long-term player tendencies (persists forever)
+- Tracks every opponent you've played against
+- Stores aggression %, VPIP %, fold rate, total hands
+- Automatically loads when players return to the table
+- Builds a profile over time for better reads
+
+**`current_game.json`** - Current session only (wiped on new game)
+- Current chip stacks and positions
+- Pot size and community cards
+- Action history for this hand
+- Gets reset when you call `setup_game()`
+
+**How it works:**
+- `setup_game()` → Loads historical stats, creates fresh current game
+- `update_game_state()` → Saves both files after every action
+- Server restart → Player stats preserved, current game state lost
+- New player appears → Auto-created with fresh stats
+
+This means Claude remembers that Bob is a tight player from last week's game!
 
 ## Setup
 
@@ -222,6 +245,7 @@ TTS Output (British voice): "Solid bet, Bob. Let's up the stakes. I raise to 60.
 - [x] Claude-powered decision making (mental pot odds calculation)
 - [x] Player tendency tracking (aggression, VPIP, fold rate)
 - [x] Integrated trash talk in announcements
+- [x] JSON persistence for player stats across sessions
 
 ### V2 (Next)
 - [ ] OCR for automated card recognition (YOLO model)
