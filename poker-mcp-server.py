@@ -481,10 +481,29 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
         # Load historical player stats
         player_stats = load_player_stats()
 
-        game_state["claude_chips"] = claude_chips
         game_state["players"] = {}
 
+        # Check if Claude is in the players list
+        claude_in_list = None
+        opponents = []
+
         for player in players:
+            name = player.get("name", "Unknown")
+            if name.lower() == "claude":
+                claude_in_list = player
+            else:
+                opponents.append(player)
+
+        # Set Claude's chips and position
+        if claude_in_list:
+            game_state["claude_chips"] = claude_in_list.get("chips", claude_chips)
+            game_state["claude_position"] = claude_in_list.get("position", "")
+        else:
+            game_state["claude_chips"] = claude_chips
+            game_state["claude_position"] = ""
+
+        # Process opponent players
+        for player in opponents:
             name = player.get("name", "Unknown")
             chips = player.get("chips", 1000)
             position = player.get("position", "")
@@ -537,9 +556,10 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
 
         return {
             "status": "success",
-            "message": f"Claude ready to play against {len(players)} opponents",
-            "claude_chips": claude_chips,
-            "opponents": len(players)
+            "message": f"Claude ready to play against {len(opponents)} opponents",
+            "claude_chips": game_state["claude_chips"],
+            "claude_position": game_state["claude_position"],
+            "opponents": len(opponents)
         }
     except Exception as e:
         return {"error": str(e)}
@@ -760,13 +780,15 @@ def mcp_capture_cards() -> Dict:
 
 @mcp.tool()
 def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
-    """Initialize a new poker game with opponents and chip stacks.
+    """Initialize a new poker game with all players including Claude.
 
     WHEN TO USE: Call this FIRST at the start of every poker session, before any hands are dealt.
 
     CONTEXT: Sets up the game state with all players at the table, their starting chip counts,
     and positions. This creates the foundation for tracking chip stacks, position dynamics,
     and player tendencies throughout the session.
+
+    IMPORTANT: Claude is a player at the table and needs a position and chip stack.
 
     📱 SMARTPHONE INTERFACE (OPTIONAL):
     ====================================
@@ -794,16 +816,19 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
     ALTERNATIVE: Direct terminal input (recommended for lower latency)
 
     PARAMETERS:
-    - players: List of opponent dicts with keys: "name", "chips", "position"
+    - players: List of ALL player dicts including Claude, with keys: "name", "chips", "position"
       Example: [{"name": "Alice", "chips": 1000, "position": "BTN"},
-                {"name": "Bob", "chips": 1500, "position": "SB"}]
-    - claude_chips: Your starting chip stack (default 1000)
+                {"name": "Bob", "chips": 1500, "position": "SB"},
+                {"name": "Claude", "chips": 1000, "position": "BB"}]
+      Note: If Claude is not in the list, claude_chips parameter is used with no position
+    - claude_chips: Fallback chip stack if Claude not in players list (default 1000)
 
     RETURNS:
     {
         "status": "success",
         "message": "Claude ready to play against N opponents",
         "claude_chips": 1000,
+        "claude_position": "BB",
         "opponents": N,
         "web_interface_url": "http://<ip>:5000"
     }
