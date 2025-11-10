@@ -5,8 +5,8 @@
   "version": "1.0.0",
   "mcpServers": {
     "claude-poker": {
-      "command": "~/claude-poker/venv/bin/python3",
-      "args": ["~/poker-mcp-server.py"]
+      "command": "${CLAUDE_PLUGIN_ROOT}/venv/bin/python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/poker-mcp-server.py"]
     }
   }
 }

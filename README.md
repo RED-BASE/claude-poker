@@ -21,7 +21,7 @@ Most AI poker tools are either:
 - 📸 **Webcam Card Capture** - Sees its own cards via webcam (cards kept SECRET)
 - 🗣️ **Voice Output** - Neural TTS via Piper engine (British voice)
 - 💬 **Trash Talk Engine** - Contextual table commentary and psychology
-- 📱 **Web Interface** - Remote input via smartphone/tablet browser
+- 📱 **Voice Input** - Use your phone's voice dictation to talk to Claude at the table
 - 🧠 **Game State Tracking** - Remembers opponents, tendencies, chip stacks
 - 🎲 **Mental Poker Strategy** - Claude calculates pot odds and makes decisions using poker knowledge
 
@@ -73,9 +73,11 @@ rather than relying on a calculator tool. This allows for more sophisticated rea
 in implied odds, position, player tendencies, and meta-game considerations beyond pure equity.
 
 ### 2. Web Interface (`web/`)
-Optional remote input interface:
-- `index.html` - Text/voice input interface for smartphone/tablet
+Optional remote voice input via smartphone:
+- `index.html` - Voice dictation interface for smartphone/tablet
+- Use your phone's native speech-to-text to talk to Claude at the table
 - Flask server integrated into MCP server (runs automatically on port 5000)
+- Messages sent via xdotool to Claude's terminal
 - No need to start separately - launches with MCP server
 
 ### 3. Card Capture (`deal.sh`)
@@ -97,17 +99,28 @@ For optimal card capture, use a simple card holder positioned in front of your w
 - Position holder directly below/in front of webcam
 - Ensure good lighting (no glare on cards)
 - Cards should be clearly visible and flat
-- Test with `deal.sh` to verify capture works
-- Adjust angle/distance for best OCR results (future feature)
+- Test capture by asking Claude: "Capture my cards and tell me what you see"
+- Adjust angle/distance for best clarity
 
 ## Setup
 
 ### Prerequisites
-```bash
-# System dependencies
-sudo apt-get install xdotool ffmpeg v4l-utils
 
-# Piper TTS (neural voice)
+**What each tool does:**
+- `ffmpeg` - Captures webcam images for card reading
+- `v4l-utils` - Webcam device detection and validation
+- `xdotool` - **Optional:** Only if you want to use phone voice dictation at the table (web interface)
+- `Piper TTS` - Neural text-to-speech for voice output
+
+```bash
+# Check what you need (might already have some):
+which ffmpeg v4l2-ctl xdotool
+
+# Install missing packages (requires sudo/root for apt-get):
+sudo apt-get install ffmpeg v4l-utils  # Required: webcam capture
+sudo apt-get install xdotool            # Optional: for phone voice dictation (web interface)
+
+# Piper TTS (neural voice) - no sudo needed
 # Download from: https://github.com/rhasspy/piper/releases
 # Quick install:
 mkdir -p ~/piper ~/.local/share/piper/voices
@@ -127,28 +140,27 @@ pip install -r requirements.txt
 
 ### Install Claude Poker Plugin
 
-1. Clone/copy the repo to your home directory:
+1. Clone repo directly into Claude plugins directory:
 ```bash
-# If cloning from git:
-cd ~ && git clone <your-repo-url> claude-poker
+cd ~/.claude/plugins
+git clone https://github.com/RED-BASE/claude-poker.git
 
-# Or if you already have it elsewhere:
-cp -r /path/to/claude-poker ~/claude-poker
+# Or if you have it elsewhere, symlink it:
+ln -s /path/to/your/claude-poker ~/.claude/plugins/claude-poker
 ```
 
-2. Copy MCP server to home directory:
+2. Install Python dependencies in the plugin's venv:
 ```bash
-cp ~/claude-poker/poker-mcp-server.py ~/
-chmod +x ~/poker-mcp-server.py
+cd ~/.claude/plugins/claude-poker
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+deactivate
 ```
 
-3. Install plugin:
-```bash
-mkdir -p ~/.claude/plugins/claude-poker
-cp ~/claude-poker/plugin/marketplace.json ~/.claude/plugins/claude-poker/
-```
+3. Restart Claude Code to load the plugin
 
-4. Restart Claude Code to load the plugin
+**Note:** The plugin uses `${CLAUDE_PLUGIN_ROOT}` to find files, so everything stays in the plugin directory - no copying files around!
 
 **Note:** Web server starts automatically when MCP server runs - no need to start separately.
 Access from any device on your local network: `http://<your-ip>:5000`
