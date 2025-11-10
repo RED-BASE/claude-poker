@@ -406,10 +406,10 @@ def capture_cards() -> Dict:
     """
     try:
         # Use ffmpeg to capture from webcam to low-quality JPEG
-        # deal.sh auto-detects webcam and saves to /tmp/poker_hand.jpg
+        # get-hole-cards.sh auto-detects webcam and saves to /tmp/poker_hand.jpg
         # Use path relative to this script (plugin root)
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        deal_script = os.path.join(script_dir, 'deal.sh')
+        deal_script = os.path.join(script_dir, 'get-hole-cards.sh')
         result = subprocess.run(
             ['bash', deal_script],
             capture_output=True,

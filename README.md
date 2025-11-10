@@ -177,10 +177,11 @@ Use your phone's voice dictation to talk to Claude at the table:
 
 ### Card Capture
 
-The `deal.sh` script auto-detects your webcam:
+The `get-hole-cards.sh` script auto-detects your webcam:
 - Scans /dev/video0-9 for working camera
 - Captures single frame to /tmp/poker_hand.jpg
 - Claude analyzes image using vision capability
+- Overwrites the image file for each new hand
 
 ### Card Holder Setup
 
