@@ -15,6 +15,43 @@ Most AI poker tools are either:
 
 (We say "autonom-ish" because while Claude makes its own decisions and speaks for itself, it still needs you to tell it the game state via voice/text input.)
 
+## Quick Start
+
+**Get Claude playing poker in ~5 minutes:**
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/RED-BASE/claude-poker.git
+cd claude-poker
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Register with Claude Code
+claude mcp add claude-poker
+
+# When prompted:
+#   Command: ~/claude-poker/venv/bin/python3
+#   Arguments: ~/claude-poker/poker-mcp-server.py
+
+# 3. Install system dependencies (if not already installed)
+sudo apt-get install ffmpeg v4l-utils        # Required: webcam
+sudo apt-get install xdotool                  # Optional: phone voice input
+
+# 4. Restart Claude Code, then say:
+"Setup game: Alice has 500 chips, Bob has 500 chips, I have 500 chips"
+
+# 5. Place cards in front of webcam and say:
+"Capture my cards"
+
+# 6. Update game state and let Claude play:
+"Pot is 30, Alice bet 20, what do you do?"
+```
+
+**That's it!** Claude will analyze the situation, calculate odds, and respond with voice output.
+
+**Note:** For voice output, install [Piper TTS](https://github.com/rhasspy/piper/releases) and download a voice model (see full Setup section below).
+
 ## Features
 
 - 🎯 **Autonom-ish Decision Making** - Claude plays for itself, not as an advisor
@@ -235,32 +272,6 @@ Claude's Internal Reasoning:
 
 TTS Output (British voice): "Solid bet, Bob. Let's up the stakes. I raise to 60."
 ```
-
-## Roadmap
-
-### V1 (Current - MVP)
-- [x] MCP server with 4 core poker tools
-- [x] Web interface for remote input (Flask integrated)
-- [x] Neural TTS via Piper (British voice)
-- [x] Webcam card capture with auto-detection
-- [x] Claude-powered decision making (mental pot odds calculation)
-- [x] Player tendency tracking (aggression, VPIP, fold rate)
-- [x] Integrated strategic banter in announcements
-- [x] JSON persistence for player stats across sessions
-
-### V2 (Next)
-- [ ] OCR for automated card recognition (YOLO model)
-- [ ] Hand history logging and session analysis
-- [ ] Advanced GTO solver integration (optional)
-- [ ] Multiple voice personalities for table banter
-- [ ] Bet sizing optimization
-
-### V3 (Future)
-- [ ] Multi-table support
-- [ ] Tournament mode
-- [ ] Advanced tells detection
-- [ ] Custom personality modes
-- [ ] Video demo compilation
 
 ## Security Note
 
