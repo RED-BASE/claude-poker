@@ -12,6 +12,11 @@ poker-mcp-server-old.py
 test_*.py
 *.HEIC
 
+# Leftover directories from development
+.claude/
+.claude-plugin/
+gui_capture_data/
+
 # Allow images directory for documentation
 !images/
 !images/*.png

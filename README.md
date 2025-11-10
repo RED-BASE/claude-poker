@@ -11,7 +11,7 @@ Most AI poker tools are either:
 - Tournament solvers (academic)
 - Advisors (boring)
 
-**Claude Poker is an autonom-ish player at live physical tables** with trash talk as a core feature. It's AI you can actually play against.
+**Claude Poker is an autonom-ish player at live physical tables** with conversational and strategic banter as a core feature. It's AI you can actually play against.
 
 (We say "autonom-ish" because while Claude makes its own decisions and speaks for itself, it still needs you to tell it the game state via voice/text input.)
 
@@ -20,7 +20,7 @@ Most AI poker tools are either:
 - 🎯 **Autonom-ish Decision Making** - Claude plays for itself, not as an advisor
 - 📸 **Webcam Card Capture** - Sees its own cards via webcam (cards kept SECRET)
 - 🗣️ **Voice Output** - Neural TTS via Piper engine (British voice)
-- 💬 **Trash Talk Engine** - Contextual table commentary and psychology
+- 💬 **Strategic Banter** - Contextual table commentary and psychology
 - 📱 **Voice Input** - Use your phone's voice dictation to talk to Claude at the table
 - 🧠 **Game State Tracking** - Remembers opponents, tendencies, chip stacks across sessions
 - 🎲 **Mental Poker Strategy** - Claude calculates pot odds and makes decisions using poker knowledge
@@ -72,13 +72,14 @@ The brain. 4 MCP tools that Claude uses:
 rather than relying on a calculator tool. This allows for more sophisticated reasoning that factors
 in implied odds, position, player tendencies, and meta-game considerations beyond pure equity.
 
-### 2. Web Interface (`web/`)
+### 2. Web Interface (`web/index.html`)
 Optional remote voice input via smartphone:
-- `index.html` - Voice dictation interface for smartphone/tablet
+- Voice dictation interface for smartphone/tablet
 - Use your phone's native speech-to-text to talk to Claude at the table
 - Flask server integrated into MCP server (runs automatically on port 5000)
 - Messages sent via xdotool to Claude's terminal
 - No need to start separately - launches with MCP server
+- **Note:** `web/server.py` is deprecated - Flask is now integrated in poker-mcp-server.py
 
 ### 3. Card Capture (`deal.sh`)
 Auto-detecting webcam capture with v4l2 support
@@ -215,7 +216,7 @@ Access from any device on your local network: `http://<your-ip>:5000`
 5. **Claude responds** (via voice):
    - Captures cards (if not done)
    - Calculates odds
-   - Generates trash talk
+   - Generates strategic banter
    - Makes decision
    - Speaks: "Raise to 45. Let's make this interesting."
 
@@ -244,21 +245,21 @@ TTS Output (British voice): "Solid bet, Bob. Let's up the stakes. I raise to 60.
 - [x] Webcam card capture with auto-detection
 - [x] Claude-powered decision making (mental pot odds calculation)
 - [x] Player tendency tracking (aggression, VPIP, fold rate)
-- [x] Integrated trash talk in announcements
+- [x] Integrated strategic banter in announcements
 - [x] JSON persistence for player stats across sessions
 
 ### V2 (Next)
 - [ ] OCR for automated card recognition (YOLO model)
 - [ ] Hand history logging and session analysis
 - [ ] Advanced GTO solver integration (optional)
-- [ ] Multiple voice personalities for trash talk
+- [ ] Multiple voice personalities for table banter
 - [ ] Bet sizing optimization
 
 ### V3 (Future)
 - [ ] Multi-table support
 - [ ] Tournament mode
 - [ ] Advanced tells detection
-- [ ] Custom trash talk personalities
+- [ ] Custom personality modes
 - [ ] Video demo compilation
 
 ## Security Note
@@ -271,11 +272,11 @@ This is a portfolio piece demonstrating:
 - Real-time AI decision making
 - Multi-modal I/O (vision, voice, text)
 - Strategic reasoning under pressure
-- Personality/trash talk generation
+- Personality and strategic banter generation
 - Mobile interface design
 - MCP server development
 
-It's also just fun as hell.
+It's also incredibly fun.
 
 ## Legal
 
