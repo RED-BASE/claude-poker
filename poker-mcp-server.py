@@ -198,8 +198,11 @@ def evaluate_hand(cards: List[str]) -> Tuple[int, List[int]]:
 
 # CLAUDE'S game state (persistent across hands)
 game_state = {
-    "players": {},  # Opponents at the table
+    "players": {},  # Opponents at the table (includes seat numbers)
     "claude_chips": 1000,  # CLAUDE'S chip stack
+    "claude_seat": None,  # CLAUDE'S seat number at the table
+    "button_seat": 0,  # Which seat has the dealer button (rotates each hand)
+    "total_seats": 0,  # Total number of seats at the table
     "current_hand": {
         "claude_cards": None,  # CLAUDE'S hole cards (NEVER print to terminal)
         "community_cards": [],
@@ -259,13 +262,16 @@ def save_current_game():
 
     # Build saveable game state (exclude claude_cards for security)
     save_data = {
-        "version": "1.0",
+        "version": "2.0",  # Updated version for seat-based system
         "started_at": datetime.now().isoformat(),
         "claude_chips": game_state["claude_chips"],
+        "claude_seat": game_state.get("claude_seat"),
+        "button_seat": game_state.get("button_seat", 0),
+        "total_seats": game_state.get("total_seats", 0),
         "players": {
             name: {
                 "chips": data["chips"],
-                "position": data["position"]
+                "seat": data.get("seat", 0)
             }
             for name, data in game_state["players"].items()
         },
@@ -472,6 +478,109 @@ def capture_cards() -> Dict:
         return {"error": str(e), "status": "failed"}
 
 
+def calculate_position(seat: int, button_seat: int, total_seats: int) -> str:
+    """Calculate poker position from seat number and button position
+
+    Args:
+        seat: Player's seat number
+        button_seat: Current button seat number
+        total_seats: Total number of seats at table
+
+    Returns:
+        Position string: "BTN", "SB", "BB", "UTG", "MP", "CO", etc.
+    """
+    if total_seats < 2:
+        return "BTN"
+
+    # Calculate offset from button
+    offset = (seat - button_seat) % total_seats
+
+    if offset == 0:
+        return "BTN"  # Button
+    elif offset == 1:
+        return "SB"   # Small blind
+    elif offset == 2:
+        return "BB"   # Big blind
+    elif total_seats == 3:
+        return "BTN" if offset == 0 else ("SB" if offset == 1 else "BB")
+    elif total_seats <= 6:
+        # Short-handed (6-max or less)
+        if offset == 3:
+            return "UTG"  # Under the gun
+        elif offset == 4:
+            return "MP"   # Middle position
+        elif offset == 5:
+            return "CO"   # Cutoff
+        else:
+            return f"Seat{offset}"
+    else:
+        # Full ring (7+ players)
+        if offset == 3:
+            return "UTG"
+        elif offset == 4:
+            return "UTG+1"
+        elif offset == 5:
+            return "MP"
+        elif offset == total_seats - 2:
+            return "CO"   # Cutoff (one before button)
+        else:
+            return f"MP{offset-4}"  # Middle positions
+
+
+def get_all_positions() -> Dict[str, str]:
+    """Get current positions for all players based on button seat
+
+    Returns:
+        Dict mapping player names to their current positions
+    """
+    positions = {}
+
+    # Calculate Claude's position
+    if game_state["claude_seat"] is not None:
+        positions["Claude"] = calculate_position(
+            game_state["claude_seat"],
+            game_state["button_seat"],
+            game_state["total_seats"]
+        )
+
+    # Calculate opponent positions
+    for name, player_data in game_state["players"].items():
+        if "seat" in player_data:
+            positions[name] = calculate_position(
+                player_data["seat"],
+                game_state["button_seat"],
+                game_state["total_seats"]
+            )
+
+    return positions
+
+
+def rotate_button() -> Dict:
+    """Move dealer button to next seat for new hand
+
+    Returns:
+        Dict with new button position and all player positions
+    """
+    if game_state["total_seats"] == 0:
+        return {"error": "No game setup yet. Call setup_game first."}
+
+    # Move button to next seat
+    game_state["button_seat"] = (game_state["button_seat"] + 1) % game_state["total_seats"]
+
+    # Get new positions
+    positions = get_all_positions()
+
+    # Save updated game state
+    save_current_game()
+
+    return {
+        "status": "success",
+        "button_seat": game_state["button_seat"],
+        "message": f"Button moved to seat {game_state['button_seat']}",
+        "positions": positions
+    }
+
+
 def setup_game(players: List[Dict], claude_chips: int) -> Dict:
     """Initialize game state with CLAUDE and opponents
 
@@ -483,9 +592,10 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
 
         game_state["players"] = {}
 
-        # Check if Claude is in the players list
+        # Check if Claude is in the players list and assign seat numbers
         claude_in_list = None
         opponents = []
+        seat_counter = 0
 
         for player in players:
             name = player.get("name", "Unknown")
@@ -494,26 +604,36 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
             else:
                 opponents.append(player)
 
-        # Set Claude's chips and position
+        # Set total seats (Claude + opponents)
+        game_state["total_seats"] = len(players)
+
+        # Assign seat to Claude (first if in list, otherwise last seat)
         if claude_in_list:
             game_state["claude_chips"] = claude_in_list.get("chips", claude_chips)
-            game_state["claude_position"] = claude_in_list.get("position", "")
+            # Check if seat was explicitly provided, otherwise auto-assign
+            game_state["claude_seat"] = claude_in_list.get("seat", seat_counter)
+            seat_counter += 1
         else:
             game_state["claude_chips"] = claude_chips
-            game_state["claude_position"] = ""
+            game_state["claude_seat"] = len(opponents)  # Claude gets last seat
 
-        # Process opponent players
+        # Initialize button to seat 0
+        game_state["button_seat"] = 0
+
+        # Process opponent players and assign seats
         for player in opponents:
             name = player.get("name", "Unknown")
             chips = player.get("chips", 1000)
-            position = player.get("position", "")
+            # Get explicit seat or auto-assign
+            seat = player.get("seat", seat_counter)
+            seat_counter += 1
 
             # Check if we have historical stats for this player
             if name in player_stats["players"]:
                 historical = player_stats["players"][name]
                 game_state["players"][name] = {
                     "chips": chips,
-                    "position": position,
+                    "seat": seat,
                     "tendencies": [],
                     # Load historical stats
                     "hands_played": historical.get("hands_played", 0),
@@ -530,7 +650,7 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
                 # New player - initialize with fresh stats
                 game_state["players"][name] = {
                     "chips": chips,
-                    "position": position,
+                    "seat": seat,
                     "tendencies": [],
                     "hands_played": 0,
                     "total_actions": 0,
@@ -554,12 +674,18 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
         # Save fresh current_game.json
         save_current_game()
 
+        # Calculate initial positions based on button
+        initial_positions = get_all_positions()
+
         return {
             "status": "success",
             "message": f"Claude ready to play against {len(opponents)} opponents",
             "claude_chips": game_state["claude_chips"],
-            "claude_position": game_state["claude_position"],
-            "opponents": len(opponents)
+            "claude_seat": game_state["claude_seat"],
+            "button_seat": game_state["button_seat"],
+            "total_seats": game_state["total_seats"],
+            "opponents": len(opponents),
+            "positions": initial_positions
         }
     except Exception as e:
         return {"error": str(e)}
@@ -785,10 +911,16 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
     WHEN TO USE: Call this FIRST at the start of every poker session, before any hands are dealt.
 
     CONTEXT: Sets up the game state with all players at the table, their starting chip counts,
-    and positions. This creates the foundation for tracking chip stacks, position dynamics,
+    and SEAT NUMBERS. Seats are fixed, but positions (BB, SB, BTN) rotate with the dealer button
+    each hand. This creates the foundation for tracking chip stacks, positional dynamics,
     and player tendencies throughout the session.
 
-    IMPORTANT: Claude is a player at the table and needs a position and chip stack.
+    IMPORTANT: Claude is a player at the table and needs a seat assignment and chip stack.
+
+    SEAT vs POSITION:
+    - Seat: Fixed physical position (0, 1, 2, ...) - never changes
+    - Position: Poker role (BB, SB, BTN, UTG, etc.) - rotates each hand with dealer button
+    - Button rotates clockwise, changing everyone's position
 
     📱 SMARTPHONE INTERFACE (OPTIONAL):
     ====================================
@@ -816,11 +948,12 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
     ALTERNATIVE: Direct terminal input (recommended for lower latency)
 
     PARAMETERS:
-    - players: List of ALL player dicts including Claude, with keys: "name", "chips", "position"
-      Example: [{"name": "Alice", "chips": 1000, "position": "BTN"},
-                {"name": "Bob", "chips": 1500, "position": "SB"},
-                {"name": "Claude", "chips": 1000, "position": "BB"}]
-      Note: If Claude is not in the list, claude_chips parameter is used with no position
+    - players: List of ALL player dicts including Claude, with keys: "name", "chips"
+      Example: [{"name": "Alice", "chips": 1000},
+                {"name": "Bob", "chips": 1500},
+                {"name": "Claude", "chips": 1000}]
+      Seats are auto-assigned (0, 1, 2, ...) in order. Button starts at seat 0.
+      Note: If Claude is not in the list, claude_chips parameter is used
     - claude_chips: Fallback chip stack if Claude not in players list (default 1000)
 
     RETURNS:
@@ -828,12 +961,21 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
         "status": "success",
         "message": "Claude ready to play against N opponents",
         "claude_chips": 1000,
-        "claude_position": "BB",
-        "opponents": N,
+        "claude_seat": 2,
+        "button_seat": 0,
+        "total_seats": 3,
+        "opponents": 2,
+        "positions": {
+            "Alice": "BTN",
+            "Bob": "SB",
+            "Claude": "BB"
+        },
         "web_interface_url": "http://<ip>:5000"
     }
 
-    WORKFLOW TIP: After setup, proceed to capture_cards for each new hand.
+    WORKFLOW TIP:
+    - After setup, call mcp_rotate_button() at start of each new hand to move button
+    - Then call mcp_capture_cards() to capture new hole cards
     """
     result = setup_game(players, claude_chips)
 
@@ -911,6 +1053,46 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
     WORKFLOW TIP: Call this before making decisions so you have full context on opponent tendencies.
     """
     return update_game_state(pot, action_history, player_actions, community_cards, chip_updates)
+
+
+@mcp.tool()
+def mcp_rotate_button() -> Dict:
+    """Rotate the dealer button to the next seat for a new hand.
+
+    WHEN TO USE: Call this at the START of each new hand, before capturing cards.
+
+    CONTEXT: In poker, the dealer button rotates clockwise after each hand. This changes
+    everyone's position (BB, SB, BTN, etc.) which is critical for strategy. Early position
+    (BB, SB, UTG) plays tighter, late position (CO, BTN) plays looser.
+
+    WORKFLOW:
+    1. Hand ends (someone wins pot)
+    2. Call mcp_rotate_button() - button moves, positions update
+    3. Call mcp_capture_cards() - capture new hole cards
+    4. Continue with normal game flow
+
+    RETURNS:
+    {
+        "status": "success",
+        "button_seat": 1,
+        "message": "Button moved to seat 1",
+        "positions": {
+            "Claude": "SB",
+            "Alice": "BB",
+            "Bob": "BTN"
+        }
+    }
+
+    POSITION STRATEGY NOTES:
+    - Button (BTN): Most valuable position - act last, see everyone's action
+    - Cutoff (CO): Second best - one before button
+    - Small Blind (SB): Forced bet, act first post-flop (disadvantage)
+    - Big Blind (BB): Forced bet, act last pre-flop but first post-flop
+    - UTG (Under The Gun): First to act pre-flop, tightest range
+
+    Your position determines your hand range and strategy for that hand.
+    """
+    return rotate_button()
 
 if __name__ == "__main__":
     # Start web server in background thread

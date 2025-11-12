@@ -76,7 +76,10 @@ When prompted:
 # Restart Claude Code to load the MCP server
 # Then in Claude Code, say:
 
-"Setup game: Alice has 500 chips at button, Bob has 500 chips at small blind, Claude has 500 chips at big blind"
+"Setup game: Alice has 500 chips, Bob has 500 chips, Claude has 500 chips"
+
+# For each new hand:
+"New hand, rotate button"
 
 # Place Claude's cards in front of webcam and say:
 "Capture my cards"
@@ -85,7 +88,11 @@ When prompted:
 "Pot is 30, Alice bet 20, what do you do?"
 ```
 
-**Note:** Claude is a player at the table. You must specify Claude's position and chip stack when setting up the game.
+**Note:**
+- Claude is a player at the table (gets a seat assignment)
+- Seats are fixed, but the dealer button rotates each hand
+- Positions (BB, SB, BTN) are calculated from button position
+- Call "rotate button" at start of each new hand to move the button
 
 **Note:** Web server starts automatically on port 5000. Access from any device: `http://<your-ip>:5000`
 
@@ -130,39 +137,50 @@ When prompted:
 
 ### MCP Tools
 
-Claude Poker provides 4 MCP tools that Claude Code uses:
+Claude Poker provides 5 MCP tools that Claude Code uses:
 
 - `mcp_capture_cards()` - Webcam capture of Claude's hole cards (kept secret)
 - `mcp_poker_speak()` - Voice output via Piper neural TTS (British voice)
-- `mcp_setup_game()` - Initialize game with opponents and chip stacks
+- `mcp_setup_game()` - Initialize game with seat assignments and chip stacks
+- `mcp_rotate_button()` - Move dealer button for new hand (updates positions)
 - `mcp_update_game_state()` - Track pot, actions, community cards, and player tendencies
 
 Claude calculates pot odds and makes decisions mentally using poker knowledge, factoring in implied odds, position, player tendencies, and meta-game considerations.
+
+**Position System:**
+- Seats are fixed (0, 1, 2, ...)
+- Dealer button rotates each hand
+- Positions (BB, SB, BTN, UTG, etc.) are calculated from button + seat
 
 ### Game Flow
 
 1. **Start fresh Claude Code session** (to load MCP server)
 
-2. **Setup game** (Claude needs its own position and chip stack):
+2. **Setup game** (assigns seats to all players including Claude):
    ```
-   "Setup game: Bob has 500 chips at button,
-    Mike has 300 at small blind,
-    Claude has 400 chips at big blind"
+   "Setup game: Bob has 500 chips, Mike has 300 chips, Claude has 400 chips"
+   ```
+   Players are assigned seats in order: Bob=seat0, Mike=seat1, Claude=seat2
+   Button starts at seat 0 (Bob has button first hand)
+
+3. **For each new hand:**
+   ```
+   "Rotate button"
+   ```
+   Button moves clockwise, all positions update automatically
+
+4. **Capture cards:**
+   ```
+   "Capture my cards"
    ```
 
-3. **New hand:**
-   ```
-   "New hand, capture my cards"
-   ```
-
-4. **Action to Claude:**
+5. **Action to Claude:**
    ```
    "Pot is 20, Mike bet 15, what do you do?"
    ```
 
-5. **Claude responds** (via voice):
-   - Captures cards (if not done)
-   - Calculates odds
+6. **Claude responds** (via voice):
+   - Calculates odds based on current position
    - Generates strategic banter
    - Makes decision
    - Speaks: "Raise to 45. Let's make this interesting."
