@@ -78,8 +78,9 @@ When prompted:
 
 "Setup game: Alice has 500 chips, Bob has 500 chips, Claude has 500 chips"
 
-# For each new hand:
-"New hand, rotate button"
+# For each new hand, say:
+"New hand"
+# This automatically rotates button and updates positions
 
 # Place Claude's cards in front of webcam and say:
 "Capture my cards"
@@ -92,7 +93,7 @@ When prompted:
 - Claude is a player at the table (gets a seat assignment)
 - Seats are fixed, but the dealer button rotates each hand
 - Positions (BB, SB, BTN) are calculated from button position
-- Call "rotate button" at start of each new hand to move the button
+- Saying "New hand" rotates button automatically (efficient!)
 
 **Note:** Web server starts automatically on port 5000. Access from any device: `http://<your-ip>:5000`
 
@@ -165,9 +166,9 @@ Claude calculates pot odds and makes decisions mentally using poker knowledge, f
 
 3. **For each new hand:**
    ```
-   "Rotate button"
+   "New hand"
    ```
-   Button moves clockwise, all positions update automatically
+   Button automatically rotates, all positions update
 
 4. **Capture cards:**
    ```

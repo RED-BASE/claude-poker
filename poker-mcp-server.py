@@ -691,7 +691,8 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
         return {"error": str(e)}
 
 def update_game_state(pot: int, action_history: List[str], player_actions: Optional[Dict] = None,
-                      community_cards: Optional[List[str]] = None, chip_updates: Optional[Dict] = None) -> Dict:
+                      community_cards: Optional[List[str]] = None, chip_updates: Optional[Dict] = None,
+                      new_hand: bool = False) -> Dict:
     """Update current hand state and track player tendencies
 
     Args:
@@ -702,8 +703,16 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
         community_cards: Optional list of community cards (e.g., ["Ah", "Kd", "9s", "7c", "2h"])
         chip_updates: Optional dict mapping player names (or "claude") to new chip counts
                      e.g., {"Alice": 850, "claude": 1050}
+        new_hand: If True, rotates button and resets hand state for new hand
     """
     try:
+        # Handle new hand - rotate button first
+        if new_hand and game_state.get("total_seats", 0) > 0:
+            game_state["button_seat"] = (game_state["button_seat"] + 1) % game_state["total_seats"]
+            # Reset hand state
+            game_state["current_hand"]["community_cards"] = []
+            game_state["current_hand"]["claude_cards"] = None
+
         game_state["current_hand"]["pot"] = pot
         game_state["current_hand"]["action_history"] = action_history
 
@@ -794,7 +803,7 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
                 }
         save_player_stats(player_stats)
 
-        return {
+        result = {
             "status": "success",
             "current_pot": pot,
             "community_cards": game_state["current_hand"]["community_cards"],
@@ -802,6 +811,14 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
             "actions": len(action_history),
             "player_tendencies": player_summaries if player_summaries else "No player stats yet"
         }
+
+        # If new hand, include button and position info
+        if new_hand:
+            result["button_seat"] = game_state.get("button_seat", 0)
+            result["positions"] = get_all_positions()
+            result["new_hand_note"] = "Button rotated - new positions calculated"
+
+        return result
     except Exception as e:
         return {"error": str(e)}
 
@@ -994,14 +1011,22 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
 
 @mcp.tool()
 def mcp_update_game_state(pot: int, action_history: List[str], player_actions: Optional[Dict] = None,
-                          community_cards: Optional[List[str]] = None, chip_updates: Optional[Dict] = None) -> Dict:
+                          community_cards: Optional[List[str]] = None, chip_updates: Optional[Dict] = None,
+                          new_hand: bool = False) -> Dict:
     """Update the current hand state with pot size, action history, and player tendencies.
 
     WHEN TO USE: Call after each betting round or significant action to track game progress and player behavior.
+    For new hands, set new_hand=True to automatically rotate the button.
 
     CONTEXT: Poker is sequential - each action builds on the last. Tracking the pot size,
     action history, AND player tendencies allows for GTO adjustments and exploitative play.
     This tool builds a statistical profile of each opponent's playing style over time.
+
+    NEW HAND WORKFLOW (EFFICIENT):
+    - Set new_hand=True at start of new hand
+    - Button automatically rotates, positions update
+    - No need to call rotate_button separately
+    - Example: update_game_state(0, [], new_hand=True)
 
     PARAMETERS:
     - pot: Current total pot size in chips (includes all bets/raises this round)
@@ -1013,6 +1038,7 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
       Example: ["Ah", "Kd", "9s"] after flop, ["Ah", "Kd", "9s", "7c"] after turn
     - chip_updates: Optional dict with new chip counts after bets/wins
       Example: {"Alice": 850, "claude": 1150} to update chip stacks
+    - new_hand: Set to True at start of new hand to rotate button and reset hand state
 
     RETURNS:
     {
@@ -1021,6 +1047,12 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
         "community_cards": ["Ah", "Kd", "9s"],
         "claude_chips": 1050,
         "actions": 3,
+        "button_seat": 1,  # Included if new_hand=True
+        "positions": {     # Included if new_hand=True
+            "Alice": "BTN",
+            "Bob": "SB",
+            "Claude": "BB"
+        },
         "player_tendencies": {
             "Alice": {
                 "chips": 850,
@@ -1052,7 +1084,7 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
 
     WORKFLOW TIP: Call this before making decisions so you have full context on opponent tendencies.
     """
-    return update_game_state(pot, action_history, player_actions, community_cards, chip_updates)
+    return update_game_state(pot, action_history, player_actions, community_cards, chip_updates, new_hand)
 
 
 @mcp.tool()
