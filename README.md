@@ -138,13 +138,12 @@ When prompted:
 
 ### MCP Tools
 
-Claude Poker provides 5 MCP tools that Claude Code uses:
+Claude Poker provides 4 MCP tools that Claude Code uses:
 
 - `mcp_capture_cards()` - Webcam capture of Claude's hole cards (kept secret)
 - `mcp_poker_speak()` - Voice output via Piper neural TTS (British voice)
 - `mcp_setup_game()` - Initialize game with seat assignments and chip stacks
-- `mcp_rotate_button()` - Move dealer button for new hand (updates positions)
-- `mcp_update_game_state()` - Track pot, actions, community cards, and player tendencies
+- `mcp_update_game_state()` - Track pot, actions, community cards, player tendencies (rotates button when new_hand=True)
 
 Claude calculates pot odds and makes decisions mentally using poker knowledge, factoring in implied odds, position, player tendencies, and meta-game considerations.
 

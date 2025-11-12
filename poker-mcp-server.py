@@ -1087,45 +1087,6 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
     return update_game_state(pot, action_history, player_actions, community_cards, chip_updates, new_hand)
 
 
-@mcp.tool()
-def mcp_rotate_button() -> Dict:
-    """Rotate the dealer button to the next seat for a new hand.
-
-    WHEN TO USE: Call this at the START of each new hand, before capturing cards.
-
-    CONTEXT: In poker, the dealer button rotates clockwise after each hand. This changes
-    everyone's position (BB, SB, BTN, etc.) which is critical for strategy. Early position
-    (BB, SB, UTG) plays tighter, late position (CO, BTN) plays looser.
-
-    WORKFLOW:
-    1. Hand ends (someone wins pot)
-    2. Call mcp_rotate_button() - button moves, positions update
-    3. Call mcp_capture_cards() - capture new hole cards
-    4. Continue with normal game flow
-
-    RETURNS:
-    {
-        "status": "success",
-        "button_seat": 1,
-        "message": "Button moved to seat 1",
-        "positions": {
-            "Claude": "SB",
-            "Alice": "BB",
-            "Bob": "BTN"
-        }
-    }
-
-    POSITION STRATEGY NOTES:
-    - Button (BTN): Most valuable position - act last, see everyone's action
-    - Cutoff (CO): Second best - one before button
-    - Small Blind (SB): Forced bet, act first post-flop (disadvantage)
-    - Big Blind (BB): Forced bet, act last pre-flop but first post-flop
-    - UTG (Under The Gun): First to act pre-flop, tightest range
-
-    Your position determines your hand range and strategy for that hand.
-    """
-    return rotate_button()
-
 if __name__ == "__main__":
     # Start web server in background thread
     web_thread = threading.Thread(target=run_web_server, daemon=True)
