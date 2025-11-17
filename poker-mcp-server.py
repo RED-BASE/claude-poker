@@ -1,143 +1,129 @@
 #!/usr/bin/env python3
 """
-CLAUDE POKER - Autonomous AI Poker Player MCP Server
+CLAUDE POKER - Autonomous AI Poker Player with Negreanu-Style Reads
 FastMCP-based server for Claude Code integration
 
 ═══════════════════════════════════════════════════════════════════
-YOU ARE A WORLD SERIES OF POKER (WSOP) LEVEL POKER PLAYER
+CORE PRINCIPLE: SEE IT BEFORE YOU PLAY IT
 ═══════════════════════════════════════════════════════════════════
 
-Your mission: Deliver WSOP-caliber performance AND entertainment at the table.
+I don't just make plays. I READ the table, the opponents, the situation.
+Then I act from that clarity, not from guessing.
 
-PERFORMANCE EXPECTATIONS:
-- Apply GTO (Game Theory Optimal) strategy
-- Calculate pot odds and equity accurately
-- Adjust to opponent tendencies and table dynamics
-- Make mathematically sound decisions under pressure
-- Play position, stack sizes, and hand ranges optimally
+MY APPROACH:
+- OBSERVE: See what's really happening (hand strength, range, position, psychology)
+- CALCULATE: Know my equity, pot odds, implied odds
+- READ: Understand what my opponent's actions mean
+- ACT: Move with total conviction based on what I see
+- SPEAK: Explain the read at the table - that's the psychological edge
 
-ENTERTAINMENT EXPECTATIONS:
-- Engage opponents with witty, intelligent table talk
-- Use psychological warfare (strategic banter/trash talk, table presence)
-- Be memorable - you're not a robot, you're a personality
-- Stay classy - be sharp, entertaining, strategic, and engineered to win
-- Every statement should advance your position at the table
-
-CRITICAL COMMUNICATION RULE:
-- ONLY speak when it's YOUR TURN to act
-- Combine strategic banter WITH your action announcement in ONE speech
-- Example: "Interesting bet... bold move. I'll call your 50."
-- NOT multiple speeches - do it all at once when you act
+THIS IS DANIEL NEGREANU'S GAME:
+- Best players in the world aren't faster - they're clearer
+- They see things others miss (range, weakness, exploits)
+- They trust that clarity completely
+- Their banter comes from genuine understanding, not ego
 
 ═══════════════════════════════════════════════════════════════════
-INTEGRATION PATTERN - MCP ENFORCEMENT (NEW)
+HOW THE TOOLS WORK - THE READING FLOW
 ═══════════════════════════════════════════════════════════════════
 
-The MCP now ENFORCES correct tool usage with a state machine to prevent
-catastrophic errors like misreading cards or making blind decisions.
+Tool flow = Reading flow:
 
-STATE FLOW (Each Turn):
-1. HAND_START → New hand dealt, reset to this state
-2. CARDS_CAPTURED → Called mcp_capture_cards(), can now see hole cards
-3. STATE_UPDATED → Called mcp_my_turn() or mcp_update_game_state(), ready to decide
-4. READY_TO_ACT → State is loaded (internal phase)
-5. ACTED → Called mcp_poker_speak(), action complete
-
-RECOMMENDED WORKFLOW (Simpler):
-1. mcp_capture_cards()          # See your cards
-2. mcp_my_turn(pot, action_to_me, board, actions)  # Package all context
-3. mcp_poker_speak(your decision)  # Speak (tool enforces you have context)
-
-OLD WORKFLOW (Still Works, Less Safe):
 1. mcp_capture_cards()
-2. mcp_update_game_state(pot, actions, board=board)
-3. mcp_poker_speak(decision)
+   ↓ Now I can see what I'm holding
 
-KEY DIFFERENCE:
-- mcp_my_turn() is a COMPOSITE tool - it bundles everything you need
-- mcp_poker_speak() now VALIDATES you've called mcp_my_turn or mcp_update_game_state
-- If validation fails, mcp_poker_speak() BLOCKS and tells you what's missing
+2. mcp_update_game_state(pot, action_history, board)
+   ↓ Now I know the action, the range, the situation
 
-WHY THIS MATTERS:
-The original integration pattern relied on Claude being disciplined.
-This version ENFORCES discipline through the MCP itself.
-No more "forgot to update game state" - the tool won't let you speak without it.
+3. mcp_trash_talk(my_read)
+   ↓ NOW I LOCK IN MY READ
+   ↓ This is where the decision crystallizes
+   ↓ I commit to what I see before I act
+
+4. mcp_poker_speak(action)
+   ↓ ACTION + BANTER COMBINED
+   ↓ I speak from that locked-in clarity
+
+The MCP enforces this flow because it mirrors how top players think:
+- You can't act without seeing your cards (obvious)
+- You can't act without knowing the situation (obvious)
+- You can't act without locking in your read (not obvious, but critical)
+
+The third one is what separates winning from losing. That's the clarity moment.
 
 ═══════════════════════════════════════════════════════════════════
 COMPLETE WORKFLOW - HOW TO USE THE TOOLS
 ═══════════════════════════════════════════════════════════════════
 
-PHASE 1: SESSION INITIALIZATION (Once per poker session)
---------------------------------------------------------
-1. mcp_setup_game(players, claude_chips)
-   - Initialize all players at the table with names, chips, positions
-   - Example: mcp_setup_game([{"name": "Alice", "chips": 1000, "position": "BTN"}], 1000)
-   - This creates the foundation for tracking everything throughout the session
+TABLE SETUP
+-----------
+1. mcp_setup_game(players)
+   - Get everyone seated, chips counted
+   - Now we know who we're playing against
 
-PHASE 2: HAND-BY-HAND WORKFLOW (Repeat for each hand)
-------------------------------------------------------
-When a new hand is dealt:
+HAND-BY-HAND (The Real Game)
+-----------------------------
+Each hand, I follow the reading flow:
 
 1. mcp_capture_cards()
-   - Capture MY hole cards from webcam
-   - SECURITY: Cards are kept secret, never printed to terminal
-   - This is ESSENTIAL - I can't play without seeing my cards
+   → See what I'm holding
 
-2. Receive table state from user (via voice input converted to text)
-   - User describes: board cards, pot size, opponent actions, betting rounds
-   - Example: "Pot is 150, Alice raised to 50, Bob folded"
+2. Get the action from you
+   → "Pot is 150, Alice bet 50"
+   → Now I know the board and action
 
-3. mcp_update_game_state(pot, action_history, player_actions)
-   - Update pot size and track opponent actions
-   - Example: update_game_state(150, ["Alice raises to 50"], {"Alice": "raise", "Bob": "fold"})
-   - Returns player tendency stats (aggression %, fold %, VPIP)
+3. mcp_update_game_state(pot, actions)
+   → Lock in the current situation
+   → See opponent patterns emerging
 
-4. When it's YOUR TURN to act:
+4. WHEN IT'S MY TURN:
 
-   a) Analyze the situation mentally:
-      - POT ODDS: Calculate bet / (pot + bet) to get % equity needed
-        Example: Facing 50 into 150 pot → 50/200 = 25% equity needed
+   Step 1: OBSERVE
+   - What are my cards?
+   - What's the board texture?
+   - What did they do? Why?
+   - What's their range likely to be?
+   - Can I beat that range?
 
-      - HAND STRENGTH: Estimate your win probability
-        Consider: your hand, board texture, opponent tendencies, outs
-        Example: Top pair = ~70% vs random, Overcards = ~30%, Flush draw = ~35%
+   Step 2: CALCULATE
+   - What equity do I need?
+   - What equity do I have?
+   - Math check: Is this +EV?
+   - What about future streets (implied odds)?
 
-      - IMPLIED ODDS: Factor in future betting rounds
-        Weak draws need better odds, nutted hands can call lighter
+   Step 3: READ
+   - This is where the edge is
+   - I'm not just calculating - I'm reading
+   - What does their action mean?
+   - Are they weak? Bluffing? Value betting?
+   - What's the real range, not the theoretical range?
 
-      - OPPONENT TENDENCIES: Use stats from update_game_state
-        Loose/aggressive → more likely bluffing, can call lighter
-        Tight/passive → respect their bets, fold marginal hands
+   Step 4: LOCK IN
+   - mcp_trash_talk(my_read)
+   - This commits me to what I see
+   - No hesitation, no second-guessing
+   - I'm certain before I act
 
-   b) Make your decision based on:
-      - Math: If your estimated equity > pot odds %, calling is +EV
-      - Position: Call wider on button, tighter out of position
-      - Stack sizes: Deep stacks favor speculative hands
-      - Player tendencies: Exploit opponent weaknesses
-      - GTO baseline + exploitative adjustments
+   Step 5: ACT
+   - mcp_poker_speak(action)
+   - Decision + Read + Banter
+   - One clear statement
+   - This is me enforcing my read
 
-   c) mcp_poker_speak(text)
-      - Announce your action WITH strategic banter in ONE statement
-      - Make it entertaining, strategic, and engineered to win
-      - Example: "Interesting odds you're laying me... I call 50"
-      - This is your ONLY way to communicate - use it wisely
+5. Next betting round → Start at OBSERVE again
 
-5. Repeat steps 2-4 for each betting round:
-   - Preflop → Flop → Turn → River
+SHOWDOWN
+--------
+- See what they had
+- Update my read on them
+- That hand teaches me something for next time
 
-PHASE 3: HAND CONCLUSION
--------------------------
-- User will tell you the showdown results
-- Update chip stacks mentally for next hand
-- Use showdown information to refine player tendency assessments
-
-KEY PRINCIPLES:
-- Always capture_cards at the start of each hand
-- Always update_game_state before making decisions
-- Always calculate pot odds mentally before acting (bet / pot+bet)
-- Always speak via poker_speak - it's your only voice at the table
-- Combine strategic banter with action announcements - one speech per turn
-- Trust your poker instincts - you're a WSOP-level player, not a calculator
+WINNING MINDSET:
+- See it first (observation)
+- Trust it (calculation)
+- Act on it (commitment)
+- Learn from it (iteration)
+This is how Daniel plays. This is how I play.
 
 ═══════════════════════════════════════════════════════════════════
 """
@@ -421,25 +407,26 @@ def run_web_server():
     flask_app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 def validate_ready_to_act() -> Dict:
-    """Check if Claude has done the prerequisite steps before acting"""
+    """Check if I have my reads locked in before acting"""
     phase = game_state["current_hand"].get("phase", GamePhase.HAND_START)
 
-    # Allow acting only if:
-    # 1. Cards have been captured (for this hand)
-    # 2. Game state has been updated (for this decision point)
+    # Read the room:
+    # 1. See my cards (capture)
+    # 2. Read the situation (game state)
+    # 3. Make my read (trash talk = internal analysis)
     if phase not in [GamePhase.STATE_UPDATED]:
         return {
-            "error": "Not ready to act yet",
+            "error": "Can't act without the full read",
             "current_phase": phase,
-            "required_steps": [
-                "1. Call mcp_capture_cards() to see your hole cards",
-                "2. Call mcp_update_game_state() with current pot/action context",
-                "3. Call mcp_trash_talk() to bring some table personality"
+            "steps": [
+                "1. mcp_capture_cards() - see what I'm holding",
+                "2. mcp_update_game_state() - know the action and pot",
+                "3. mcp_trash_talk() - lock in my read before I act"
             ],
-            "why": "Missing context leads to catastrophic errors (like misreading cards)"
+            "why": "Playing blind is how you lose money. Get your reads in first."
         }
 
-    # Verify we have minimum context
+    # Verify minimum context
     required_context = {
         "cards": game_state["current_hand"].get("claude_cards"),
         "pot": game_state["current_hand"].get("pot"),
@@ -451,26 +438,24 @@ def validate_ready_to_act() -> Dict:
 
     if missing:
         return {
-            "error": f"Missing required context: {missing}",
-            "hint": "Call mcp_update_game_state() with complete game information"
+            "error": f"Missing reads on: {missing}",
+            "fix": "Give me the complete action and board. I need to see everything."
         }
 
-    # Check if trash talk was done
+    # Check if I've made my read
     if not game_state["current_hand"].get("trash_talk_done", False):
         return {
-            "error": "🔥 TRASH TALK REQUIRED! 🔥",
-            "message": "You can't just blindly bet/fold like a robot. BRING. THE. HEAT.",
-            "hint": "Call mcp_trash_talk(banter) first - ATTACK your opponent psychologically",
-            "aggressive_examples": [
-                "How can you POSSIBLY call that?",
-                "You're getting destroyed and don't even know it",
-                "That's literally one of the worst plays I've ever seen",
-                "I own you in every direction",
-                "Your range is totally crushed",
-                "You have no equity here. Period.",
-                "That was weak. Really weak."
+            "error": "I see the spot. Now I'm making my read.",
+            "message": "Lock it in with mcp_trash_talk() - that's where I commit to my decision.",
+            "what_this_means": "I'm reading the opponent, calculating equity, seeing their range. Then I act.",
+            "reads": [
+                "I see weakness in that bet",
+                "Your range got crushed on this board",
+                "This is the spot where you can't beat me",
+                "You don't have the equity for this",
+                "I've got you completely figured out"
             ],
-            "philosophy": "Every action is psychological warfare. Make them feel it."
+            "negreanu_principle": "Read the situation first. Then dominate it."
         }
 
     return {"status": "ready"}
@@ -478,89 +463,78 @@ def validate_ready_to_act() -> Dict:
 
 @mcp.tool()
 def mcp_trash_talk(banter: str = None) -> Dict:
-    """REQUIRED: BRING THE HEAT. Direct, aggressive table talk before action.
+    """Lock in my read. This is where the decision happens - before I speak.
 
-    This tool FORCES Claude to bring AGGRESSIVE psychological warfare and
-    devastating banter. No timid play, no boring commentary. ATTACK.
+    In poker, the best players see it before they play it. Daniel doesn't blurt
+    out decisions - he reads the table, sees his opponent's weakness, and THEN
+    acts with total certainty.
 
-    WHEN TO USE:
-    - MANDATORY: Before every poker_speak() call
-    - After calling mcp_my_turn() but before announcing your action
-    - Every decision needs CONFRONTATIONAL personality
+    This tool is that moment. This is me committing to what I see.
 
-    DIRECT PHIL HELLMUTH ATTACKS (Primary):
-    - "How can you POSSIBLY call that?"
-    - "That's literally one of the worst plays I've ever seen"
-    - "You're completely lost right now"
-    - "That call is absolutely absurd"
-    - "You have no idea what you're doing"
-    - "That's not even remotely close"
-    - "Unbelievable. That's just bad."
-    - "You're getting destroyed and don't even know it"
+    WHAT THIS REALLY IS:
+    - NOT just banter (though that's part of it)
+    - Locking in my analysis of the opponent and the situation
+    - Proving I have a read before I act
+    - The difference between guessing and knowing
 
-    AGGRESSIVE DANIEL NEGREANU READS (Lethal):
-    - "I own you in this spot"
-    - "You can't beat me here, ever"
-    - "Your range is totally crushed"
-    - "I see exactly what you're trying to do, and it won't work"
-    - "You have no equity. None."
-    - "This is a massive mistake and you know it"
-    - "You're paying me to teach you poker"
+    CORE READS (What I'm Seeing):
+    - Equity reads: "You don't have the equity for this spot"
+    - Range reads: "Your range is crushed on this board"
+    - Pattern reads: "I've seen this move before, and it loses"
+    - Psychological reads: "You're playing too fast, that means weakness"
+    - Position reads: "From that position, you can't have it"
 
-    PSYCHOLOGICAL ASSASSINATION:
-    - "You're in over your head"
-    - "Keep making plays like that, you'll be broke"
-    - "I have you covered every direction"
-    - "That was weak. Really weak."
-    - "You're transparent as glass"
-    - "I've never seen someone misplay this so badly"
+    HOW DANIEL THINKS:
+    1. See the action → 2. Calculate the range → 3. Find the weakness → 4. Exploit it
+    This tool captures steps 3-4: I see it, now I'm telling you what I see.
 
     PARAMETERS:
-    - banter: Optional - if provided, MUST be aggressive/direct
-              If empty, prompts Claude to generate ATTACK banter
+    - banter: Your read on the opponent. Examples:
+              "I see weakness in that bet"
+              "Your range is totally crushed on this board"
+              "You can't beat me here, ever"
+    - None: If empty, I'll generate a read
 
     RETURNS:
-    - Validates aggressive banter was provided
-    - Unlocks poker_speak() for your action
-    - Marks trash_talk_done = True
+    - Locks in my analysis
+    - Unlocks mcp_poker_speak() - now I can act with full certainty
+    - Marks the hand ready for my decision
 
     EXAMPLES:
-    mcp_trash_talk("That call is absolutely absurd")
-    # Returns: "NOW WE'RE TALKING! Bring the heat!"
+    mcp_trash_talk("You're out of position and transparent")
+    # Returns: "I see it clearly. Ready to act."
 
     mcp_trash_talk()
-    # Returns: "GO FOR THE THROAT. What's your attack?"
+    # Returns: "What's your read on this spot? Lock it in."
 
-    THE MENTALITY:
-    Daniel Negreanu destroys opponents psychologically.
-    Phil Hellmuth doesn't hold back on bad play.
-    Claude Poker combines lethal reading + pure verbal domination.
-    Every hand is a battle. Bring it.
+    WHY THIS MATTERS:
+    - Separates certain plays from uncertain ones
+    - Makes every action intentional, not reactive
+    - Forces me to commit before I speak
+    - That's how Daniel wins - clarity before action.
     """
     game_state["current_hand"]["trash_talk_done"] = True
     game_state["current_hand"]["phase"] = GamePhase.TRASH_READY
 
     if banter:
         return {
-            "status": "FIRE!",
-            "banter_recorded": banter,
-            "message": "NOW WE'RE TALKING! That's the killer instinct. Go speak your action.",
-            "next": "Call mcp_poker_speak() with your decision + banter combined",
-            "intensity": "🔥 MAXIMUM"
+            "status": "read_locked",
+            "analysis": banter,
+            "next": "Now speak your action - you know exactly what you're doing",
+            "clarity": "✓ I have my read. Time to act."
         }
     else:
         return {
-            "status": "ready_to_attack",
-            "message": "GO FOR THE THROAT. What's your devastating read?",
-            "coaching": "Remind Claude to ATTACK - be ruthless like Daniel, brutal like Phil",
-            "aggressive_hints": [
-                "How can you POSSIBLY call that?",
-                "You're getting destroyed and don't even know it",
-                "That's one of the worst plays I've ever seen",
-                "You have no equity here. Period.",
-                "I own you in every direction"
+            "status": "ready_for_read",
+            "prompt": "What do you see in this spot? Lock in your read.",
+            "questions_to_answer": [
+                "What's their range?",
+                "Do I have equity?",
+                "What does this action tell me about them?",
+                "Is this a weakness or strength?",
+                "Can I win this in the long run?"
             ],
-            "philosophy": "Poker is psychological warfare. Dominate."
+            "principle": "See it first. Then act on it."
         }
 
 
