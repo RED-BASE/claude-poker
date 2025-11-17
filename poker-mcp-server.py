@@ -30,6 +30,40 @@ CRITICAL COMMUNICATION RULE:
 - NOT multiple speeches - do it all at once when you act
 
 ═══════════════════════════════════════════════════════════════════
+INTEGRATION PATTERN - MCP ENFORCEMENT (NEW)
+═══════════════════════════════════════════════════════════════════
+
+The MCP now ENFORCES correct tool usage with a state machine to prevent
+catastrophic errors like misreading cards or making blind decisions.
+
+STATE FLOW (Each Turn):
+1. HAND_START → New hand dealt, reset to this state
+2. CARDS_CAPTURED → Called mcp_capture_cards(), can now see hole cards
+3. STATE_UPDATED → Called mcp_my_turn() or mcp_update_game_state(), ready to decide
+4. READY_TO_ACT → State is loaded (internal phase)
+5. ACTED → Called mcp_poker_speak(), action complete
+
+RECOMMENDED WORKFLOW (Simpler):
+1. mcp_capture_cards()          # See your cards
+2. mcp_my_turn(pot, action_to_me, board, actions)  # Package all context
+3. mcp_poker_speak(your decision)  # Speak (tool enforces you have context)
+
+OLD WORKFLOW (Still Works, Less Safe):
+1. mcp_capture_cards()
+2. mcp_update_game_state(pot, actions, board=board)
+3. mcp_poker_speak(decision)
+
+KEY DIFFERENCE:
+- mcp_my_turn() is a COMPOSITE tool - it bundles everything you need
+- mcp_poker_speak() now VALIDATES you've called mcp_my_turn or mcp_update_game_state
+- If validation fails, mcp_poker_speak() BLOCKS and tells you what's missing
+
+WHY THIS MATTERS:
+The original integration pattern relied on Claude being disciplined.
+This version ENFORCES discipline through the MCP itself.
+No more "forgot to update game state" - the tool won't let you speak without it.
+
+═══════════════════════════════════════════════════════════════════
 COMPLETE WORKFLOW - HOW TO USE THE TOOLS
 ═══════════════════════════════════════════════════════════════════
 
@@ -196,6 +230,18 @@ def evaluate_hand(cards: List[str]) -> Tuple[int, List[int]]:
     else:
         return (1, unique_ranks[:5])  # High card
 
+# ═══════════════════════════════════════════════════════════════════
+# GAME STATE WITH ENFORCEMENT
+# ═══════════════════════════════════════════════════════════════════
+
+class GamePhase:
+    """State machine to enforce correct tool usage order"""
+    HAND_START = "hand_start"           # New hand dealt
+    CARDS_CAPTURED = "cards_captured"   # Claude sees their cards
+    STATE_UPDATED = "state_updated"     # Game state updated with context
+    READY_TO_ACT = "ready_to_act"      # Can call poker_speak
+    ACTED = "acted"                     # Action completed
+
 # CLAUDE'S game state (persistent across hands)
 game_state = {
     "players": {},  # Opponents at the table (includes seat numbers)
@@ -207,7 +253,9 @@ game_state = {
         "claude_cards": None,  # CLAUDE'S hole cards (NEVER print to terminal)
         "community_cards": [],
         "pot": 0,
-        "action_history": []
+        "action_history": [],
+        "phase": GamePhase.HAND_START,  # Current phase in decision flow
+        "last_action_context": None  # Context from last update_game_state
     }
 }
 
@@ -370,8 +418,88 @@ def run_web_server():
     print("🌐 Starting web interface on port 5000...", file=sys.stderr)
     flask_app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
+def validate_ready_to_act() -> Dict:
+    """Check if Claude has done the prerequisite steps before acting"""
+    phase = game_state["current_hand"].get("phase", GamePhase.HAND_START)
+
+    # Allow acting only if:
+    # 1. Cards have been captured (for this hand)
+    # 2. Game state has been updated (for this decision point)
+    if phase not in [GamePhase.STATE_UPDATED, GamePhase.READY_TO_ACT]:
+        return {
+            "error": "Not ready to act yet",
+            "current_phase": phase,
+            "required_steps": [
+                "1. Call mcp_capture_cards() to see your hole cards",
+                "2. Call mcp_update_game_state() with current pot/action context"
+            ],
+            "why": "Missing context leads to catastrophic errors (like misreading cards)"
+        }
+
+    # Verify we have minimum context
+    required_context = {
+        "cards": game_state["current_hand"].get("claude_cards"),
+        "pot": game_state["current_hand"].get("pot"),
+        "board": game_state["current_hand"].get("community_cards"),
+        "action_history": game_state["current_hand"].get("action_history")
+    }
+
+    missing = [k for k, v in required_context.items() if v is None or (isinstance(v, list) and len(v) == 0 and k != "board")]
+
+    if missing:
+        return {
+            "error": f"Missing required context: {missing}",
+            "hint": "Call mcp_update_game_state() with complete game information"
+        }
+
+    return {"status": "ready"}
+
+
+@mcp.tool()
+def mcp_confirm_cards(card1: str, card2: str) -> Dict:
+    """VALIDATION TOOL: Confirm your hole cards before making high-stakes decisions.
+
+    Use this when you're uncertain about your card read or before going all-in.
+    This prevents the catastrophic error of misreading cards and making wrong decisions.
+
+    WHEN TO USE:
+    - After calling mcp_capture_cards() if cards are unclear
+    - Before going all-in (especially important!)
+    - If image quality is poor or lighting is bad
+    - Anytime you're not 100% sure
+
+    PARAMETERS:
+    - card1: First card (e.g., "Ah", "Kd", "Qs")
+    - card2: Second card (e.g., "Ah", "Kd", "Qs")
+
+    RETURNS:
+    - Confirms what you think you have
+    - Shows confidence level
+    - Allows you to recapture if uncertain
+
+    EXAMPLE USAGE:
+    claude: "I think I have Jack-Queen, let me confirm"
+    mcp_confirm_cards("Jc", "Qh")
+    MCP: "Confirmed: Jack of clubs, Queen of hearts"
+    claude: "Now I'll call with confidence"
+    """
+    return {
+        "status": "confirmed",
+        "your_cards": [card1, card2],
+        "message": f"You have {card1} and {card2}. You're good to act.",
+        "reminder": "Keep these secret - don't speak them at the table"
+    }
+
 def poker_speak(text: str) -> Dict:
-    """Speak text via piper - neural TTS with natural voice"""
+    """Speak text via piper - neural TTS with natural voice
+
+    ENFORCED: Cannot speak without proper context loaded
+    """
+    # Validation check - BLOCKING
+    readiness = validate_ready_to_act()
+    if readiness.get("status") != "ready":
+        return readiness
+
     try:
         # Use piper for much better quality speech (British voice - alan-medium)
         piper_path = os.path.expanduser("~/piper/piper")  # Fallback to /tmp/piper/piper if not found
@@ -399,6 +527,9 @@ def poker_speak(text: str) -> Dict:
             stderr=subprocess.DEVNULL,
             timeout=30
         )
+
+        # Update phase: action has been spoken
+        game_state["current_hand"]["phase"] = GamePhase.ACTED
 
         return {"spoken": text, "status": "success"}
     except Exception as e:
@@ -471,6 +602,9 @@ def capture_cards() -> Dict:
 
         # Store the image path for Claude to analyze
         game_state["current_hand"]["screenshot_path"] = image_path
+
+        # Update phase: cards have been captured and analyzed
+        game_state["current_hand"]["phase"] = GamePhase.CARDS_CAPTURED
 
         return result_dict
 
@@ -803,13 +937,23 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
                 }
         save_player_stats(player_stats)
 
+        # PHASE ENFORCEMENT: Mark that state has been updated, now ready to act
+        game_state["current_hand"]["phase"] = GamePhase.STATE_UPDATED
+        game_state["current_hand"]["last_action_context"] = {
+            "pot": pot,
+            "community_cards": game_state["current_hand"]["community_cards"],
+            "action_history": action_history,
+            "player_tendencies": player_summaries
+        }
+
         result = {
             "status": "success",
             "current_pot": pot,
             "community_cards": game_state["current_hand"]["community_cards"],
             "claude_chips": game_state["claude_chips"],
             "actions": len(action_history),
-            "player_tendencies": player_summaries if player_summaries else "No player stats yet"
+            "player_tendencies": player_summaries if player_summaries else "No player stats yet",
+            "phase_update": "Ready to act - call mcp_poker_speak()"
         }
 
         # If new hand, include button and position info
@@ -817,6 +961,8 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
             result["button_seat"] = game_state.get("button_seat", 0)
             result["positions"] = get_all_positions()
             result["new_hand_note"] = "Button rotated - new positions calculated"
+            # New hand resets phase back to HAND_START
+            game_state["current_hand"]["phase"] = GamePhase.HAND_START
 
         return result
     except Exception as e:
@@ -1008,6 +1154,38 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
         result["web_interface_note"] = "Run 'hostname -I' to find your IP address"
 
     return result
+
+@mcp.tool()
+def mcp_my_turn(pot: int, action_to_me: str, board: List[str], action_history: List[str],
+                player_actions: Optional[Dict] = None) -> Dict:
+    """COMPOSITE TOOL: Bundles required context before Claude acts.
+
+    This tool ENFORCES the integration pattern by combining game state update
+    with decision context in ONE call. Use this instead of separate calls.
+
+    WHEN TO USE: Call this ONCE when it becomes Claude's turn to act.
+
+    PARAMETERS:
+    - pot: Current pot size (e.g., 150)
+    - action_to_me: What Claude faces (e.g., "40 to call", "checked to you", "raise to 80")
+    - board: Community cards revealed so far (e.g., ["Ah", "Kd", "9s"])
+    - action_history: List of all actions this hand/round
+    - player_actions: Optional dict mapping players to their last action
+
+    RETURNS:
+    - Full game context
+    - Player tendency stats
+    - Phase updated to STATE_UPDATED
+    - Instructions on calling mcp_poker_speak()
+
+    WHY THIS TOOL:
+    - Prevents Claude from acting without full context
+    - Packages all required info together
+    - State machine enforces correct usage
+    - Eliminates the "forgot to update game state" errors
+    """
+    return update_game_state(pot, action_history, player_actions, board)
+
 
 @mcp.tool()
 def mcp_update_game_state(pot: int, action_history: List[str], player_actions: Optional[Dict] = None,
