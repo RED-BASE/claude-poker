@@ -239,7 +239,7 @@ class GamePhase:
     HAND_START = "hand_start"           # New hand dealt
     CARDS_CAPTURED = "cards_captured"   # Claude sees their cards
     STATE_UPDATED = "state_updated"     # Game state updated with context
-    READY_TO_ACT = "ready_to_act"      # Can call poker_speak
+    TRASH_READY = "trash_ready"        # Trash talk required before speaking
     ACTED = "acted"                     # Action completed
 
 # CLAUDE'S game state (persistent across hands)
@@ -255,7 +255,9 @@ game_state = {
         "pot": 0,
         "action_history": [],
         "phase": GamePhase.HAND_START,  # Current phase in decision flow
-        "last_action_context": None  # Context from last update_game_state
+        "last_action_context": None,  # Context from last update_game_state
+        "trash_talk_required": True,  # Must call trash_talk() before poker_speak()
+        "trash_talk_done": False  # Becomes True after mcp_trash_talk() called
     }
 }
 
@@ -425,13 +427,14 @@ def validate_ready_to_act() -> Dict:
     # Allow acting only if:
     # 1. Cards have been captured (for this hand)
     # 2. Game state has been updated (for this decision point)
-    if phase not in [GamePhase.STATE_UPDATED, GamePhase.READY_TO_ACT]:
+    if phase not in [GamePhase.STATE_UPDATED]:
         return {
             "error": "Not ready to act yet",
             "current_phase": phase,
             "required_steps": [
                 "1. Call mcp_capture_cards() to see your hole cards",
-                "2. Call mcp_update_game_state() with current pot/action context"
+                "2. Call mcp_update_game_state() with current pot/action context",
+                "3. Call mcp_trash_talk() to bring some table personality"
             ],
             "why": "Missing context leads to catastrophic errors (like misreading cards)"
         }
@@ -452,7 +455,86 @@ def validate_ready_to_act() -> Dict:
             "hint": "Call mcp_update_game_state() with complete game information"
         }
 
+    # Check if trash talk was done
+    if not game_state["current_hand"].get("trash_talk_done", False):
+        return {
+            "error": "Trash talk required!",
+            "message": "You gotta bring some personality to the table!",
+            "hint": "Call mcp_trash_talk(banter) first - remind Claude to talk smack",
+            "examples": [
+                "How can you call that?",
+                "You're drawing dead, friend",
+                "That's bold... or foolish",
+                "Math doesn't lie"
+            ]
+        }
+
     return {"status": "ready"}
+
+
+@mcp.tool()
+def mcp_trash_talk(banter: str = None) -> Dict:
+    """REQUIRED: Bring table personality before committing to action.
+
+    This tool FORCES Claude to add psychological warfare and entertaining banter
+    before speaking its decision. No boring poker robots here!
+
+    WHEN TO USE:
+    - MANDATORY: Before every poker_speak() call
+    - After calling mcp_my_turn() but before announcing your action
+    - Every decision needs personality
+
+    DANIEL NEGREANU STYLE (Default):
+    - Sophisticated reads ("You're representing strength, but I see through it")
+    - Psychological warfare ("Interesting spot... let me think about your range")
+    - Table presence ("That bet looks uncomfortable. Am I right?")
+    - Strategic commentary ("Math beats luck every time")
+
+    PHIL HELLMUTH FLAIR (Mixed in):
+    - Dramatic reactions ("How can you even make that call?")
+    - Confidence ("That's not even close")
+    - Incredulity ("Unbelievable!")
+    - Commentary ("That's one of the worst bets I've ever seen")
+
+    PARAMETERS:
+    - banter: Optional - if provided, validates it's actual trash talk
+              If empty, prompts Claude to generate banter
+
+    RETURNS:
+    - Validates banter was provided
+    - Unlocks poker_speak() for your action
+    - Marks trash_talk_done = True
+
+    EXAMPLES:
+    mcp_trash_talk()
+    # Returns: "Go ahead, talk some smack!"
+
+    mcp_trash_talk("How can you call with that?")
+    # Returns: "Nice! Ready to speak your action now"
+
+    PSYCHOLOGY:
+    Poker is theater. Every decision comes with table narrative.
+    Daniel Negreanu reads opponents like books.
+    Phil Hellmuth doesn't let bad plays go uncommented.
+    Claude Poker combines both: intelligent analysis + pure entertainment.
+    """
+    game_state["current_hand"]["trash_talk_done"] = True
+    game_state["current_hand"]["phase"] = GamePhase.TRASH_READY
+
+    if banter:
+        return {
+            "status": "fire!",
+            "banter_recorded": banter,
+            "message": "That's the stuff! Now go speak your action.",
+            "next": "Call mcp_poker_speak() with your decision + banter combined"
+        }
+    else:
+        return {
+            "status": "ready",
+            "message": "Time to bring the heat! What's your psychological angle?",
+            "coaching": "Remind Claude to add personality - be Daniel with Phil's flair",
+            "hint": "Try: 'How can you call that?', 'Math doesn't lie', 'That's interesting...'"
+        }
 
 
 @mcp.tool()
@@ -963,6 +1045,8 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
             result["new_hand_note"] = "Button rotated - new positions calculated"
             # New hand resets phase back to HAND_START
             game_state["current_hand"]["phase"] = GamePhase.HAND_START
+            # Reset trash talk requirement for new hand
+            game_state["current_hand"]["trash_talk_done"] = False
 
         return result
     except Exception as e:
