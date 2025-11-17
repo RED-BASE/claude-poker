@@ -142,6 +142,9 @@ from typing import Dict, List, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
 from flask import Flask, request, jsonify, send_from_directory
 
+# Create FastMCP server BEFORE tool decorators
+mcp = FastMCP("claude-poker")
+
 # Set display environment
 os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
 
@@ -1052,9 +1055,6 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
         return result
     except Exception as e:
         return {"error": str(e)}
-
-# Create FastMCP server
-mcp = FastMCP("claude-poker")
 
 @mcp.tool()
 def mcp_poker_speak(text: str) -> Dict:
