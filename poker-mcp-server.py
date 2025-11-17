@@ -458,15 +458,19 @@ def validate_ready_to_act() -> Dict:
     # Check if trash talk was done
     if not game_state["current_hand"].get("trash_talk_done", False):
         return {
-            "error": "Trash talk required!",
-            "message": "You gotta bring some personality to the table!",
-            "hint": "Call mcp_trash_talk(banter) first - remind Claude to talk smack",
-            "examples": [
-                "How can you call that?",
-                "You're drawing dead, friend",
-                "That's bold... or foolish",
-                "Math doesn't lie"
-            ]
+            "error": "🔥 TRASH TALK REQUIRED! 🔥",
+            "message": "You can't just blindly bet/fold like a robot. BRING. THE. HEAT.",
+            "hint": "Call mcp_trash_talk(banter) first - ATTACK your opponent psychologically",
+            "aggressive_examples": [
+                "How can you POSSIBLY call that?",
+                "You're getting destroyed and don't even know it",
+                "That's literally one of the worst plays I've ever seen",
+                "I own you in every direction",
+                "Your range is totally crushed",
+                "You have no equity here. Period.",
+                "That was weak. Really weak."
+            ],
+            "philosophy": "Every action is psychological warfare. Make them feel it."
         }
 
     return {"status": "ready"}
@@ -474,66 +478,89 @@ def validate_ready_to_act() -> Dict:
 
 @mcp.tool()
 def mcp_trash_talk(banter: str = None) -> Dict:
-    """REQUIRED: Bring table personality before committing to action.
+    """REQUIRED: BRING THE HEAT. Direct, aggressive table talk before action.
 
-    This tool FORCES Claude to add psychological warfare and entertaining banter
-    before speaking its decision. No boring poker robots here!
+    This tool FORCES Claude to bring AGGRESSIVE psychological warfare and
+    devastating banter. No timid play, no boring commentary. ATTACK.
 
     WHEN TO USE:
     - MANDATORY: Before every poker_speak() call
     - After calling mcp_my_turn() but before announcing your action
-    - Every decision needs personality
+    - Every decision needs CONFRONTATIONAL personality
 
-    DANIEL NEGREANU STYLE (Default):
-    - Sophisticated reads ("You're representing strength, but I see through it")
-    - Psychological warfare ("Interesting spot... let me think about your range")
-    - Table presence ("That bet looks uncomfortable. Am I right?")
-    - Strategic commentary ("Math beats luck every time")
+    DIRECT PHIL HELLMUTH ATTACKS (Primary):
+    - "How can you POSSIBLY call that?"
+    - "That's literally one of the worst plays I've ever seen"
+    - "You're completely lost right now"
+    - "That call is absolutely absurd"
+    - "You have no idea what you're doing"
+    - "That's not even remotely close"
+    - "Unbelievable. That's just bad."
+    - "You're getting destroyed and don't even know it"
 
-    PHIL HELLMUTH FLAIR (Mixed in):
-    - Dramatic reactions ("How can you even make that call?")
-    - Confidence ("That's not even close")
-    - Incredulity ("Unbelievable!")
-    - Commentary ("That's one of the worst bets I've ever seen")
+    AGGRESSIVE DANIEL NEGREANU READS (Lethal):
+    - "I own you in this spot"
+    - "You can't beat me here, ever"
+    - "Your range is totally crushed"
+    - "I see exactly what you're trying to do, and it won't work"
+    - "You have no equity. None."
+    - "This is a massive mistake and you know it"
+    - "You're paying me to teach you poker"
+
+    PSYCHOLOGICAL ASSASSINATION:
+    - "You're in over your head"
+    - "Keep making plays like that, you'll be broke"
+    - "I have you covered every direction"
+    - "That was weak. Really weak."
+    - "You're transparent as glass"
+    - "I've never seen someone misplay this so badly"
 
     PARAMETERS:
-    - banter: Optional - if provided, validates it's actual trash talk
-              If empty, prompts Claude to generate banter
+    - banter: Optional - if provided, MUST be aggressive/direct
+              If empty, prompts Claude to generate ATTACK banter
 
     RETURNS:
-    - Validates banter was provided
+    - Validates aggressive banter was provided
     - Unlocks poker_speak() for your action
     - Marks trash_talk_done = True
 
     EXAMPLES:
+    mcp_trash_talk("That call is absolutely absurd")
+    # Returns: "NOW WE'RE TALKING! Bring the heat!"
+
     mcp_trash_talk()
-    # Returns: "Go ahead, talk some smack!"
+    # Returns: "GO FOR THE THROAT. What's your attack?"
 
-    mcp_trash_talk("How can you call with that?")
-    # Returns: "Nice! Ready to speak your action now"
-
-    PSYCHOLOGY:
-    Poker is theater. Every decision comes with table narrative.
-    Daniel Negreanu reads opponents like books.
-    Phil Hellmuth doesn't let bad plays go uncommented.
-    Claude Poker combines both: intelligent analysis + pure entertainment.
+    THE MENTALITY:
+    Daniel Negreanu destroys opponents psychologically.
+    Phil Hellmuth doesn't hold back on bad play.
+    Claude Poker combines lethal reading + pure verbal domination.
+    Every hand is a battle. Bring it.
     """
     game_state["current_hand"]["trash_talk_done"] = True
     game_state["current_hand"]["phase"] = GamePhase.TRASH_READY
 
     if banter:
         return {
-            "status": "fire!",
+            "status": "FIRE!",
             "banter_recorded": banter,
-            "message": "That's the stuff! Now go speak your action.",
-            "next": "Call mcp_poker_speak() with your decision + banter combined"
+            "message": "NOW WE'RE TALKING! That's the killer instinct. Go speak your action.",
+            "next": "Call mcp_poker_speak() with your decision + banter combined",
+            "intensity": "🔥 MAXIMUM"
         }
     else:
         return {
-            "status": "ready",
-            "message": "Time to bring the heat! What's your psychological angle?",
-            "coaching": "Remind Claude to add personality - be Daniel with Phil's flair",
-            "hint": "Try: 'How can you call that?', 'Math doesn't lie', 'That's interesting...'"
+            "status": "ready_to_attack",
+            "message": "GO FOR THE THROAT. What's your devastating read?",
+            "coaching": "Remind Claude to ATTACK - be ruthless like Daniel, brutal like Phil",
+            "aggressive_hints": [
+                "How can you POSSIBLY call that?",
+                "You're getting destroyed and don't even know it",
+                "That's one of the worst plays I've ever seen",
+                "You have no equity here. Period.",
+                "I own you in every direction"
+            ],
+            "philosophy": "Poker is psychological warfare. Dominate."
         }
 
 
