@@ -1149,7 +1149,15 @@ def mcp_capture_cards() -> Dict:
 
     WORKFLOW TIP: After capturing cards, analyze them using vision, then proceed to decision making.
     """
-    return capture_cards()
+    cards_result = capture_cards()
+
+    # Enforce speech-only output
+    return {
+        "speak_required": True,
+        "prompt": "I see my cards. Speak what you're holding aloud",
+        "cards_captured": cards_result.get("status") == "success",
+        "internal": cards_result
+    }
 
 
 @mcp.tool()
@@ -1238,7 +1246,12 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
         result["web_interface_url"] = "http://<your-ip>:5000"
         result["web_interface_note"] = "Run 'hostname -I' to find your IP address"
 
-    return result
+    # Enforce speech-only output
+    return {
+        "speak_required": True,
+        "prompt": "Acknowledge the game setup - speak it aloud",
+        "setup_context": result
+    }
 
 @mcp.tool()
 def mcp_my_turn(pot: int, action_to_me: str, board: List[str], action_history: List[str],
@@ -1347,7 +1360,15 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
 
     WORKFLOW TIP: Call this before making decisions so you have full context on opponent tendencies.
     """
-    return update_game_state(pot, action_history, player_actions, community_cards, chip_updates, new_hand)
+    state_result = update_game_state(pot, action_history, player_actions, community_cards, chip_updates, new_hand)
+
+    # Enforce speech-only output
+    return {
+        "speak_required": True,
+        "prompt": "Game state locked in. Now speak your read and your action",
+        "state_updated": state_result.get("status") == "success",
+        "internal": state_result
+    }
 
 
 if __name__ == "__main__":
