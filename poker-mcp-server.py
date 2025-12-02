@@ -149,11 +149,51 @@ mcp = FastMCP("claude-poker")
 os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
 
 # Poker hand evaluation helpers
+VALID_RANKS = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+               'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+VALID_SUITS = {'h', 'd', 'c', 's'}
+
+
+class CardParseError(ValueError):
+    """Raised when a card string cannot be parsed."""
+    pass
+
+
 def parse_card(card_str: str) -> Tuple[int, str]:
-    """Parse card string like 'Ah' into (rank_value, suit)"""
-    rank_map = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-                'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-    return (rank_map[card_str[0]], card_str[1])
+    """Parse card string like 'Ah' into (rank_value, suit).
+
+    Args:
+        card_str: Two-character string like 'Ah', 'Kd', 'Ts', '2c'
+                  Rank: 2-9, T(10), J, Q, K, A
+                  Suit: h(hearts), d(diamonds), c(clubs), s(spades)
+
+    Returns:
+        Tuple of (rank_value, suit) where rank_value is 2-14
+
+    Raises:
+        CardParseError: If card_str is invalid format, rank, or suit
+    """
+    if not card_str or not isinstance(card_str, str):
+        raise CardParseError(f"Card must be a non-empty string, got: {card_str!r}")
+
+    if len(card_str) != 2:
+        raise CardParseError(f"Card must be exactly 2 characters (e.g., 'Ah'), got: {card_str!r}")
+
+    rank_char, suit_char = card_str[0], card_str[1]
+
+    if rank_char not in VALID_RANKS:
+        raise CardParseError(
+            f"Invalid rank '{rank_char}' in card '{card_str}'. "
+            f"Valid ranks: 2-9, T, J, Q, K, A"
+        )
+
+    if suit_char not in VALID_SUITS:
+        raise CardParseError(
+            f"Invalid suit '{suit_char}' in card '{card_str}'. "
+            f"Valid suits: h (hearts), d (diamonds), c (clubs), s (spades)"
+        )
+
+    return (VALID_RANKS[rank_char], suit_char)
 
 def evaluate_hand(cards: List[str]) -> Tuple[int, List[int]]:
     """Evaluate 5-7 cards and return (hand_rank, tiebreakers)
@@ -352,16 +392,31 @@ def get_claude_window_id():
     try:
         with open('/tmp/claude-window-id.txt', 'r') as f:
             return f.read().strip()
-    except:
+    except FileNotFoundError:
+        # Cache file doesn't exist, fall back to xdotool search
+        pass
+    except IOError as e:
+        print(f"Warning: Could not read window ID cache: {e}", file=sys.stderr)
+
+    # Fall back to xdotool search
+    try:
         result = subprocess.run(
             ['xdotool', 'search', '--name', 'tmux'],
             env={'DISPLAY': ':0'},
             capture_output=True,
-            text=True
+            text=True,
+            timeout=5
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip().split('\n')[0]
-        return None
+    except subprocess.TimeoutExpired:
+        print("Warning: xdotool search timed out", file=sys.stderr)
+    except FileNotFoundError:
+        print("Warning: xdotool not found. Install with: sudo apt-get install xdotool", file=sys.stderr)
+    except subprocess.SubprocessError as e:
+        print(f"Warning: xdotool error: {e}", file=sys.stderr)
+
+    return None
 
 def send_to_claude_terminal(message):
     """Type message into Claude Code terminal via xdotool"""
@@ -667,8 +722,8 @@ def capture_cards() -> Dict:
                     troubleshooting["available_devices"] = video_devices
                 else:
                     troubleshooting["available_devices"] = "No /dev/video* devices found"
-            except:
-                pass
+            except OSError as e:
+                troubleshooting["available_devices"] = f"Could not scan for devices: {e}"
 
             return troubleshooting
 
@@ -888,7 +943,11 @@ def setup_game(players: List[Dict], claude_chips: int) -> Dict:
             "claude_cards": None,
             "community_cards": [],
             "pot": 0,
-            "action_history": []
+            "action_history": [],
+            "phase": GamePhase.HAND_START,
+            "last_action_context": None,
+            "trash_talk_required": True,
+            "trash_talk_done": False
         }
 
         # Save fresh current_game.json
@@ -998,7 +1057,7 @@ def update_game_state(pot: int, action_history: List[str], player_actions: Optio
                     "chips": data["chips"],
                     "aggression": f"{data['aggression_pct']}%",
                     "fold_rate": f"{data['fold_pct']}%",
-                    "vpip": f"{data['vpip']}%"
+                    "vpip": f"{data.get('vpip', data.get('vpip_pct', 0))}%"
                 }
 
         # Save current game state
@@ -1242,9 +1301,14 @@ def mcp_setup_game(players: List[Dict], claude_chips: int = 1000) -> Dict:
         local_ip = socket.gethostbyname(hostname)
         result["web_interface_url"] = f"http://{local_ip}:5000"
         result["web_interface_note"] = "Access from any device on your local network"
-    except:
+    except socket.gaierror:
+        # Hostname resolution failed (common in isolated environments)
         result["web_interface_url"] = "http://<your-ip>:5000"
         result["web_interface_note"] = "Run 'hostname -I' to find your IP address"
+    except OSError as e:
+        # Other network-related errors
+        result["web_interface_url"] = "http://<your-ip>:5000"
+        result["web_interface_note"] = f"Could not determine IP ({e}). Run 'hostname -I' to find it"
 
     # Enforce speech-only output
     return {
@@ -1371,7 +1435,95 @@ def mcp_update_game_state(pot: int, action_history: List[str], player_actions: O
     }
 
 
+def check_system_dependencies() -> dict:
+    """Check for required system tools and return status report.
+
+    Returns:
+        Dict with 'ok' (bool) and 'missing'/'warnings' lists
+    """
+    result = {"ok": True, "missing": [], "warnings": [], "found": []}
+
+    # Required tools - server won't function without these
+    required_tools = {
+        "ffmpeg": "Video capture/playback. Install: sudo apt-get install ffmpeg",
+        "ffplay": "Audio playback (part of ffmpeg). Install: sudo apt-get install ffmpeg",
+    }
+
+    # Optional tools - features will be limited without these
+    optional_tools = {
+        "xdotool": "Web remote input feature. Install: sudo apt-get install xdotool",
+        "v4l2-ctl": "Webcam detection. Install: sudo apt-get install v4l-utils",
+    }
+
+    # Check Piper TTS
+    piper_paths = [
+        os.path.expanduser("~/piper/piper"),
+        "/tmp/piper/piper",
+        "/usr/local/bin/piper",
+    ]
+    piper_found = any(os.path.exists(p) for p in piper_paths)
+
+    for tool, help_text in required_tools.items():
+        try:
+            subprocess.run(
+                ["which", tool],
+                capture_output=True,
+                check=True,
+                timeout=5
+            )
+            result["found"].append(tool)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            result["missing"].append(f"{tool}: {help_text}")
+            result["ok"] = False
+
+    for tool, help_text in optional_tools.items():
+        try:
+            subprocess.run(
+                ["which", tool],
+                capture_output=True,
+                check=True,
+                timeout=5
+            )
+            result["found"].append(tool)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            result["warnings"].append(f"{tool}: {help_text}")
+
+    if not piper_found:
+        result["warnings"].append(
+            "piper: TTS voice output. See README for installation instructions"
+        )
+    else:
+        result["found"].append("piper")
+
+    return result
+
+
 if __name__ == "__main__":
+    # Check dependencies first
+    deps = check_system_dependencies()
+
+    print("\n" + "="*70, file=sys.stderr)
+    print("CLAUDE POKER - Dependency Check", file=sys.stderr)
+    print("="*70, file=sys.stderr)
+
+    if deps["found"]:
+        print(f"Found: {', '.join(deps['found'])}", file=sys.stderr)
+
+    if deps["missing"]:
+        print("\nMISSING REQUIRED:", file=sys.stderr)
+        for msg in deps["missing"]:
+            print(f"  - {msg}", file=sys.stderr)
+        print("\nServer cannot start without required dependencies.", file=sys.stderr)
+        print("="*70 + "\n", file=sys.stderr)
+        sys.exit(1)
+
+    if deps["warnings"]:
+        print("\nOptional (some features may be limited):", file=sys.stderr)
+        for msg in deps["warnings"]:
+            print(f"  - {msg}", file=sys.stderr)
+
+    print("="*70, file=sys.stderr)
+
     # Start web server in background thread
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
@@ -1381,11 +1533,11 @@ if __name__ == "__main__":
 
     # Print access info to stderr (so it shows in terminal but not in MCP protocol)
     print("\n" + "="*70, file=sys.stderr)
-    print("🎰 CLAUDE POKER - MCP Server Ready", file=sys.stderr)
+    print("CLAUDE POKER - MCP Server Ready", file=sys.stderr)
     print("="*70, file=sys.stderr)
-    print(f"📱 Web Interface: http://<your-ip>:5000", file=sys.stderr)
-    print(f"🎤 TTS Engine: Piper (alan-medium neural voice)", file=sys.stderr)
-    print(f"🧠 MCP Tools: Available via Claude Code", file=sys.stderr)
+    print(f"Web Interface: http://<your-ip>:5000", file=sys.stderr)
+    print(f"TTS Engine: Piper (alan-medium neural voice)", file=sys.stderr)
+    print(f"MCP Tools: Available via Claude Code", file=sys.stderr)
     print("="*70 + "\n", file=sys.stderr)
 
     # Run MCP server (blocking)
