@@ -1,6 +1,6 @@
 # Claude Poker
 
-An autonom-ish poker player for live physical tables. Claude plays its own hands, sees its cards via webcam, speaks decisions aloud, and throws in some table talk. Built on Claude Code's MCP protocol.
+Autonom-ish poker player for live physical tables. Claude plays its own hands, sees its cards via webcam, speaks decisions aloud, and throws in some table talk. Contributions welcome.
 
 ## Features
 
@@ -110,10 +110,14 @@ Claude remembers that Bob is a tight player from last week.
 Position a card holder in front of your webcam:
 
 ![Card Holder Front View](images/card-holder-a.jpg)
-*Webcam captures from above*
+*Front view of card holder*
 
 ![Card Holder Side View](images/card-holder-b.jpg)
-*Cards should be flat and well-lit*
+*Top view showing proper card placement*
+
+## Status
+
+This is a fun project, not production software. It works but has quirks - Claude occasionally reveals its cards or forgets game state. Planning to add hooks to enforce behaviors that come up during actual play. If you use it, feedback is welcome.
 
 ## License
 
