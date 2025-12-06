@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.db
+.DS_Store
+token.json
+credentials.json
+.env
+venv/
+poker-mcp-server-old.py
+*.HEIC
+.pytest_cache/
+
+# Leftover directories from development
+.claude/
+.claude-plugin/
+gui_capture_data/
+
+# Allow images directory for documentation
+!images/
+!images/*.png
+!images/*.jpg
+
+# Keep tests directory
+!tests/
